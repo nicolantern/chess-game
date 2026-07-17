@@ -103,6 +103,14 @@ export class MatchController {
     this.bus.emit('gameover', { ...this.statusPayload(), status: 'resign', winner: color ^ 1 });
   }
 
+  /** Claim an available threefold-repetition / fifty-move draw. */
+  claimDraw() {
+    if (!this.game.canClaimDraw) return false;
+    this.clock.stop();
+    this.bus.emit('gameover', { ...this.statusPayload(), status: 'draw-repetition', winner: null });
+    return true;
+  }
+
   _rebuildCaptured() {
     this.captured = { [WHITE]: [], [1]: [] };
     for (const h of this.game.history) {
