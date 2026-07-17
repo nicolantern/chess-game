@@ -1,0 +1,102 @@
+# ♞ Chess
+
+A complete, polished, browser-based chess game: Player-vs-Player and
+Player-vs-AI, full official rules, a Minimax + alpha-beta AI with four
+difficulty levels, and a modern responsive interface. No runtime dependencies
+and no network — it runs entirely offline.
+
+## Features
+
+- **Modes** — Local multiplayer and Play vs AI (Easy / Medium / Hard / Expert).
+- **Full rules** — castling, en passant, pawn promotion (choose Q/R/B/N), check,
+  checkmate, stalemate, and draws by threefold repetition, the fifty-move rule,
+  and insufficient material. Move generation is verified against published
+  **perft** node counts.
+- **Play** — drag-and-drop or click-to-move, legal-move highlights, last-move
+  and king-in-check highlights, board flip, undo, captured-piece trays with a
+  material advantage, and a SAN move history.
+- **Clocks** — 1 / 3 / 5 / 10 / 15 / 30 minutes or unlimited.
+- **AI** — negamax with alpha-beta pruning, iterative deepening on a time
+  budget, quiescence search, MVV-LVA + killer-move ordering, and an evaluation
+  combining material, piece-square tables, king safety, mobility, and pawn
+  structure.
+- **Presentation** — scalable SVG pieces, wood/marble board themes, smooth
+  animations, and synthesized sound effects.
+- **Settings** — toggle sound, highlights, and animations; pick a board theme.
+  Persisted to `localStorage`.
+
+## Getting started
+
+```bash
+npm install
+npm run dev      # start the dev server (prints a localhost URL)
+npm test         # run the unit + perft test suite
+npm run build    # production build into dist/
+npm run preview  # serve the production build
+```
+
+Open the printed localhost URL in any modern browser.
+
+## Architecture
+
+The code is split into a DOM-free engine, the AI, and the UI. The engine and AI
+share the same move-generation API; moves are applied reversibly
+(`makeMove`/`unmakeMove`), which powers AI search, undo, and repetition
+detection alike.
+
+```
+src/
+├─ engine/     Pure rules, zero DOM (perft-verified)
+│  ├─ pieces.js      Piece/color encoding and values
+│  ├─ board.js       0x88 board geometry and the Board state container
+│  ├─ fen.js         FEN parse / serialize
+│  ├─ attacks.js     Square-attack and check detection
+│  ├─ moves.js       Move flags and reversible make/unmake
+│  ├─ movegen.js     Pseudo-legal + legal move generation
+│  ├─ perft.js       Node-count correctness harness
+│  ├─ notation.js    Standard Algebraic Notation (SAN)
+│  ├─ rules.js       Insufficient-material draw
+│  └─ game.js        Game state machine, history, status, draws
+├─ ai/
+│  ├─ psqt.js        Piece-square tables
+│  ├─ evaluation.js  Material, PSQT, king safety, mobility, pawn structure
+│  ├─ ordering.js    MVV-LVA + killer-move ordering
+│  ├─ search.js      Negamax + alpha-beta + iterative deepening + quiescence
+│  ├─ difficulty.js  Easy / Medium / Hard / Expert presets
+│  └─ ai.js          Facade the UI talks to (Web-Worker-ready seam)
+├─ ui/
+│  ├─ App.js             Screen router
+│  ├─ Menu.js            Main menu + new-game configuration
+│  ├─ MatchController.js Game + AI + clock orchestration over an event bus
+│  ├─ BoardView.js       Rendering, drag/click input, highlights, flip
+│  ├─ Animator.js        Move/capture/castle/promotion animation
+│  ├─ PromotionDialog.js Q/R/B/N picker
+│  ├─ Sidebar.js         Clocks, captured trays, SAN history, controls
+│  ├─ Clock.js           Two-sided countdown clock
+│  ├─ Settings.js        Sound/highlights/animations/theme
+│  └─ HowToPlay.js       Rules reference
+├─ assets/
+│  ├─ pieces.js      Inline SVG piece set
+│  ├─ audio.js       Web Audio sound-effect synthesizer
+│  └─ theme.css      Design tokens, board themes, responsive layout
+├─ utils/            Event bus + settings storage
+└─ main.js           Bootstrap
+```
+
+## Extending
+
+The DOM-free engine and FEN import/export are the seams for future work:
+
+- **Online multiplayer** — serialize moves/positions over the wire; the engine
+  already validates every move.
+- **Puzzles / analysis** — load any position via FEN and reuse the search.
+- **Opening books** — consult a book before calling `searchBestMove`.
+- **Web Worker AI** — move `ai/search.js` behind `ai/ai.js`'s async facade
+  without touching the UI.
+
+## Testing
+
+`npm test` runs Vitest: engine unit tests, the **perft** suite (start position,
+Kiwipete, and other reference positions) as the authoritative move-generation
+check, SAN and draw-rule tests, AI sanity (finds mate-in-one, legal at every
+difficulty), and UI-logic tests (clock, controller, event bus).
