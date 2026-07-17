@@ -1,7 +1,7 @@
 // Profile & statistics dashboard: editable name, lifetime stats, per-difficulty
 // breakdown, and the saved-games list (replay / export PGN / delete).
 
-import { loadProfile, saveProfile, resetStats } from '../utils/profile.js';
+import { loadProfile, saveProfile, resetStats, computeAchievements } from '../utils/profile.js';
 import { toPgn } from '../utils/pgn.js';
 import { DIFFICULTY_LABELS } from '../ai/difficulty.js';
 import { WHITE } from '../engine/pieces.js';
@@ -33,6 +33,7 @@ export class StatsScreen {
       `<div class="stat-tile"><span class="v">${value}</span><span class="l">${label}</span></div>`;
 
     const tiles = [
+      tile('Rating (Elo)', s.rating),
       tile('Games played', s.total),
       tile('Wins vs AI', s.wins),
       tile('Losses vs AI', s.losses),
@@ -84,6 +85,9 @@ export class StatsScreen {
           <tbody>${levelRows}</tbody>
         </table>
 
+        <h3>Achievements</h3>
+        <div class="ach-grid">${this._achievementsHtml()}</div>
+
         <h3>Saved games</h3>
         <div class="saved-list">${saved}</div>
 
@@ -94,6 +98,21 @@ export class StatsScreen {
       </div>`;
 
     this._wire();
+  }
+
+  _achievementsHtml() {
+    return computeAchievements(this.profile.stats)
+      .map(
+        (a) => `
+        <div class="ach ${a.done ? 'done' : ''}">
+          <span class="a-ico">${a.icon}</span>
+          <span class="a-txt">
+            <strong>${a.label}${a.done ? ' ✓' : ''}</strong>
+            <span>${a.desc}${a.progress && !a.done ? ` (${a.progress})` : ''}</span>
+          </span>
+        </div>`,
+      )
+      .join('');
   }
 
   _wire() {

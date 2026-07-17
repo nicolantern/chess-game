@@ -9,11 +9,13 @@ import { Animator } from './Animator.js';
 import { PromotionDialog } from './PromotionDialog.js';
 import { SoundManager } from '../assets/audio.js';
 import { FLAGS } from '../engine/moves.js';
-import { WHITE, BLACK } from '../engine/pieces.js';
+import { WHITE, BLACK, pieceType } from '../engine/pieces.js';
 import { parseFen } from '../engine/fen.js';
 import { inCheck } from '../engine/attacks.js';
-import { loadProfile, saveProfile, recordGame } from '../utils/profile.js';
+import { loadProfile, saveProfile, recordGame, computeAchievements } from '../utils/profile.js';
 import { saveInProgress, clearInProgress } from '../utils/persistence.js';
+import { searchBestMove } from '../ai/search.js';
+import { analyzeGame } from '../ai/analysis.js';
 
 // Format ms as m:ss for the game-over summary.
 function fmtDuration(ms) {
@@ -267,6 +269,32 @@ export class GameScreen {
     }
   }
 
+  // Suggest the engine's best move for the current live position as an arrow.
+  _showHint() {
+    if (this.controller.game.isOver || this.reviewPly !== null) return;
+    this.board.clearAnnotations();
+    const { move } = searchBestMove(this.controller.game.board.clone(), { maxDepth: 8, timeMs: 500 });
+    if (move) this.board.drawArrow(move.from, move.to, '#3fb37f');
+  }
+
+  // Run a full-game analysis, then annotate the move history and show a summary.
+  async _analyze() {
+    if (this._analyzing) return;
+    const moves = this.controller.game.history.map((h) => ({
+      from: h.move.from,
+      to: h.move.to,
+      promotion: h.move.promotion || 0,
+    }));
+    if (moves.length === 0) return;
+    this._analyzing = true;
+    const total = moves.length;
+    const { perMove, summary } = await analyzeGame(moves, {
+      onProgress: (done) => this.sidebar.setMessage(`🔬 Analyzing… ${Math.round((done / total) * 100)}%`),
+    });
+    this._analyzing = false;
+    this.sidebar.setAnalysis(perMove, summary);
+  }
+
   _updateCheck() {
     const game = this.controller.game;
     const kingSq = game.check ? game.board.kings[game.sideToMove] : -1;
@@ -301,6 +329,12 @@ export class GameScreen {
       case 'fullscreen':
         this._toggleFullscreen();
         break;
+      case 'hint':
+        this._showHint();
+        break;
+      case 'analyze':
+        this._analyze();
+        break;
       case 'resign':
         this.controller.resign(this.controller.mode === 'ai' ? this.humanColor : this.controller.game.sideToMove);
         break;
@@ -323,7 +357,7 @@ export class GameScreen {
     this.board.setInteractive(false);
     this.sound.play('game-end');
     clearInProgress(); // the game is finished; nothing to resume
-    this._recordStats(s);
+    const recorded = this._recordStats(s);
 
     let subtitle = '';
     if (s.status === 'stalemate' || s.status.startsWith('draw')) subtitle = 'The game is a draw.';
@@ -332,7 +366,15 @@ export class GameScreen {
     const durationMs = Date.now() - this.controller.startedAt;
     const halfMoves = this.controller.game.history.length;
     const avgMs = halfMoves ? durationMs / halfMoves : 0;
-    const meta = `Duration ${fmtDuration(durationMs)} · ${halfMoves} plies · avg ${(avgMs / 1000).toFixed(1)}s/move`;
+    let meta = `Duration ${fmtDuration(durationMs)} · ${halfMoves} plies · avg ${(avgMs / 1000).toFixed(1)}s/move`;
+    if (recorded && recorded.mode === 'ai') {
+      const delta = recorded.ratingAfter - recorded.ratingBefore;
+      const sign = delta >= 0 ? '+' : '';
+      meta += `<br>Rating ${recorded.ratingAfter} (${sign}${delta})`;
+    }
+    if (recorded && recorded.unlocked.length) {
+      recorded.unlocked.forEach((a, i) => setTimeout(() => this._toast(a), 400 + i * 900));
+    }
 
     this._removeModal();
     this.modal = document.createElement('div');
@@ -359,9 +401,10 @@ export class GameScreen {
     document.body.appendChild(this.modal);
   }
 
-  // Fold the finished game into the player's lifetime statistics.
+  // Fold the finished game into the player's lifetime statistics. Returns
+  // { ratingBefore, ratingAfter, unlocked } for the game-over display.
   _recordStats(s) {
-    if (this.replayMode) return; // don't re-count a replayed saved game
+    if (this.replayMode) return null; // don't re-count a replayed saved game
     const game = this.controller.game;
     const mode = this.controller.mode;
     let outcome = null;
@@ -371,17 +414,30 @@ export class GameScreen {
     }
     const flawless =
       outcome === 'win' && (this.controller.captured[this.humanColor] || []).length === 0;
+    // Piece that delivered checkmate (the piece now on the last move's square).
+    let matingPiece = 0;
+    if (s.status === 'checkmate' && game.lastMove) {
+      matingPiece = pieceType(game.board.squares[game.lastMove.to]);
+    }
+
     const profile = loadProfile();
+    const ratingBefore = profile.stats.rating;
+    const before = computeAchievements(profile.stats);
     recordGame(profile, {
       mode,
       outcome,
       aiLevel: this.controller.startConfig.aiLevel,
       flawless,
       mate: s.status === 'checkmate',
+      matingPiece: outcome === 'win' ? matingPiece : 0,
       moveCount: Math.ceil(game.history.length / 2), // full moves
       durationMs: Date.now() - this.controller.startedAt,
       endedAt: Date.now(),
     });
+    const after = computeAchievements(profile.stats);
+    const wasDone = new Map(before.map((a) => [a.key, a.done]));
+    const unlocked = after.filter((a) => a.done && !wasDone.get(a.key));
+    return { ratingBefore, ratingAfter: profile.stats.rating, unlocked, mode };
   }
 
   // Keep a finished game in the profile's saved-games list.
@@ -414,6 +470,22 @@ export class GameScreen {
       this.modal.remove();
       this.modal = null;
     }
+  }
+
+  // Transient "achievement unlocked" popup.
+  _toast(achievement) {
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML =
+      `<span class="t-ico">${achievement.icon}</span>` +
+      `<div class="t-body"><strong>Achievement unlocked</strong>` +
+      `<span>${achievement.label} — ${achievement.desc}</span></div>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => {
+      el.classList.remove('show');
+      el.addEventListener('transitionend', () => el.remove(), { once: true });
+    }, 3200);
   }
 
   /** Apply live settings changes (theme handled by App; here: sound + rehighlight). */

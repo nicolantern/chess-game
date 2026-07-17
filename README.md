@@ -17,9 +17,12 @@ and no network — it runs entirely offline.
   material advantage, and a SAN move history.
 - **Board tools** — right-click to draw arrows and square highlights, review the
   game with ← / → or by clicking any move, keyboard shortcuts, and fullscreen.
-- **Profiles & stats** — a player profile with lifetime W/L/D, per-difficulty
-  breakdown, streaks, averages, PGN export, replayable saved games, and
-  auto-save/resume of an unfinished game.
+- **Profiles & stats** — a player profile with an **Elo rating**, lifetime
+  W/L/D, per-difficulty breakdown, streaks, averages, six **achievements**, PGN
+  export, replayable saved games, and auto-save/resume of an unfinished game.
+- **Analysis & hints** — a best-move **hint** arrow, and post-game **analysis**
+  giving each side an accuracy % and per-move symbols (‼ brilliant, ?! / ? / ??
+  for inaccuracies, mistakes, and blunders).
 - **Clocks** — Bullet / Blitz / Rapid / Classical presets, custom time, and
   Fischer **increment** or simple **delay** — or unlimited.
 - **AI** — negamax with alpha-beta pruning, iterative deepening on a time

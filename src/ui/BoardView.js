@@ -184,21 +184,28 @@ export class BoardView {
     // Arrows.
     const defs = this.overlay.querySelector('defs').outerHTML;
     let lines = '';
-    for (const { from, to } of this.annotations.arrows) {
-      const a = this._center(from);
-      const b = this._center(to);
+    for (const arrow of this.annotations.arrows) {
+      const a = this._center(arrow.from);
+      const b = this._center(arrow.to);
       // Shorten the arrow slightly so the head sits inside the target square.
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const len = Math.hypot(dx, dy) || 1;
       const bx = b.x - (dx / len) * 4;
       const by = b.y - (dy / len) * 4;
+      const color = arrow.color || '#f0a020';
       lines +=
         `<line x1="${a.x}" y1="${a.y}" x2="${bx}" y2="${by}" ` +
-        `stroke="#f0a020" stroke-width="2.2" stroke-linecap="round" ` +
+        `stroke="${color}" stroke-width="2.2" stroke-linecap="round" ` +
         `marker-end="url(#ah)" opacity="0.85"/>`;
     }
     this.overlay.innerHTML = defs + lines;
+  }
+
+  /** Draw a programmatic arrow (e.g. a move hint) in a distinct color. */
+  drawArrow(from, to, color = '#3fb37f') {
+    this.annotations.arrows.push({ from, to, color });
+    this._renderAnnotations();
   }
 
   // --- Input ---------------------------------------------------------------
