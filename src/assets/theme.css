@@ -291,6 +291,40 @@ label.num input {
   background: #fff;
 }
 
+/* --- Account ------------------------------------------------------------- */
+.account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1.2rem;
+}
+.account-bar .who {
+  color: var(--text);
+  font-weight: 600;
+}
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.tabs button {
+  flex: 1;
+}
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.account-form .num {
+  flex: 1 1 auto;
+}
+.form-error {
+  color: var(--danger);
+  min-height: 1.1em;
+  font-size: 0.9rem;
+}
+
 /* --- Game layout ---------------------------------------------------------- */
 .game {
   flex: 1;

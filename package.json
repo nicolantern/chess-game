@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "server": "node server/index.js",
+    "server:install": "npm --prefix server install"
   },
   "devDependencies": {
     "vite": "^5.4.10",

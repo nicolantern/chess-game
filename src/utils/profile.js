@@ -67,12 +67,20 @@ export function loadProfile() {
   }
 }
 
-export function saveProfile(profile) {
+// Optional hook invoked after every local save (used to sync to the account
+// backend). Injected by the sync layer so this module stays dependency-free.
+let syncHook = null;
+export function setProfileSyncHook(fn) {
+  syncHook = fn;
+}
+
+export function saveProfile(profile, sync = true) {
   try {
     localStorage.setItem(KEY, JSON.stringify(profile));
   } catch {
     /* storage unavailable — ignore */
   }
+  if (sync && syncHook) syncHook(profile);
 }
 
 export function resetStats(profile) {

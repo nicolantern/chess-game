@@ -16,13 +16,17 @@ export const TIME_PRESETS = [
 
 const presetKey = (m, i) => `${m}-${i}`;
 
+const escapeHtml = (str) =>
+  String(str).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
 export class Menu {
-  constructor(root, { onStart, onNavigate, resumeAvailable = false, onResume }) {
+  constructor(root, { onStart, onNavigate, resumeAvailable = false, onResume, account }) {
     this.root = root;
     this.onStart = onStart;
     this.onNavigate = onNavigate;
     this.resumeAvailable = resumeAvailable;
     this.onResume = onResume;
+    this.account = account || { loggedIn: false, username: null, onLogout: () => {} };
     this.config = {
       aiLevel: 'medium',
       aiColorChoice: 'white',
@@ -36,10 +40,15 @@ export class Menu {
     const resumeBtn = this.resumeAvailable
       ? '<button class="primary" data-act="resume">▶ Resume Game</button>'
       : '';
+    const accountBar = this.account.loggedIn
+      ? `<div class="account-bar"><span class="who">👤 ${escapeHtml(this.account.username)}</span>
+           <button data-act="logout" class="ghost">Log out</button></div>`
+      : `<div class="account-bar"><button data-act="account" class="ghost">🔐 Log in / Sign up</button></div>`;
     this.root.innerHTML = `
       <div class="menu">
         <h1>♞ Chess</h1>
         <p class="subtitle">A polished chess game — play a friend or the computer.</p>
+        ${accountBar}
         <div class="menu-grid">
           ${resumeBtn}
           <button class="${this.resumeAvailable ? '' : 'primary'}" data-act="ai">Play vs AI</button>
@@ -51,6 +60,11 @@ export class Menu {
       </div>`;
     if (this.resumeAvailable) {
       this.root.querySelector('[data-act="resume"]').onclick = () => this.onResume();
+    }
+    if (this.account.loggedIn) {
+      this.root.querySelector('[data-act="logout"]').onclick = () => this.account.onLogout();
+    } else {
+      this.root.querySelector('[data-act="account"]').onclick = () => this.onNavigate('account');
     }
     this.root.querySelector('[data-act="ai"]').onclick = () => this.renderAIConfig();
     this.root.querySelector('[data-act="pvp"]').onclick = () => this.renderPvPConfig();

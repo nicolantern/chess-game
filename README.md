@@ -20,6 +20,8 @@ and no network — it runs entirely offline.
 - **Profiles & stats** — a player profile with an **Elo rating**, lifetime
   W/L/D, per-difficulty breakdown, streaks, averages, six **achievements**, PGN
   export, replayable saved games, and auto-save/resume of an unfinished game.
+- **Optional accounts** — sign up / log in to sync your profile across devices
+  (see below); fully offline and local-only when logged out.
 - **Analysis & hints** — a best-move **hint** arrow, and post-game **analysis**
   giving each side an accuracy % and per-move symbols (‼ brilliant, ?! / ? / ??
   for inaccuracies, mistakes, and blunders).
@@ -46,6 +48,33 @@ npm run preview  # serve the production build
 ```
 
 Open the printed localhost URL in any modern browser.
+
+## Accounts (optional online sync)
+
+The game is fully playable with no server — stats and saved games live in the
+browser. An optional backend adds **accounts** so your profile (stats, Elo,
+achievements, saved games) syncs across devices.
+
+```bash
+npm run server:install   # one-time: install the backend's dependencies
+npm run server           # start the API on http://localhost:3001
+npm run dev              # in another terminal; Vite proxies /api -> :3001
+```
+
+Then use **Log in / Sign up** on the main menu. Signing up seeds your account
+with your current local progress; logging in pulls your account's profile.
+Logged out (or if the server is unreachable), everything falls back to
+local-only — no feature is lost.
+
+**How it works:** Express + a small JSON file store (`server/data.json`),
+passwords hashed with bcrypt, stateless JWT sessions. The server only stores an
+opaque profile blob — it never needs to understand chess.
+
+**Deploying for real cross-device sync:** host `server/` somewhere (Render,
+Railway, Fly, a VPS…), set a strong `JWT_SECRET`, then build the frontend with
+`VITE_API_URL=https://your-server` and deploy the static `dist/`. Before
+production, also add HTTPS, restrict CORS to your frontend origin, and add rate
+limiting — the bundled dev server is intentionally minimal.
 
 ## Architecture
 

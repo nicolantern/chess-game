@@ -10,5 +10,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    // Proxy API calls to the account backend so the client can use relative
+    // '/api' paths in dev (no CORS juggling).
+    proxy: {
+      '/api': {
+        target: process.env.API_TARGET || 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
   },
 });
