@@ -17,10 +17,12 @@ export const TIME_PRESETS = [
 const presetKey = (m, i) => `${m}-${i}`;
 
 export class Menu {
-  constructor(root, { onStart, onNavigate }) {
+  constructor(root, { onStart, onNavigate, resumeAvailable = false, onResume }) {
     this.root = root;
     this.onStart = onStart;
     this.onNavigate = onNavigate;
+    this.resumeAvailable = resumeAvailable;
+    this.onResume = onResume;
     this.config = {
       aiLevel: 'medium',
       aiColorChoice: 'white',
@@ -31,19 +33,28 @@ export class Menu {
   }
 
   renderMain() {
+    const resumeBtn = this.resumeAvailable
+      ? '<button class="primary" data-act="resume">▶ Resume Game</button>'
+      : '';
     this.root.innerHTML = `
       <div class="menu">
         <h1>♞ Chess</h1>
         <p class="subtitle">A polished chess game — play a friend or the computer.</p>
         <div class="menu-grid">
-          <button class="primary" data-act="ai">Play vs AI</button>
+          ${resumeBtn}
+          <button class="${this.resumeAvailable ? '' : 'primary'}" data-act="ai">Play vs AI</button>
           <button data-act="pvp">Local Multiplayer</button>
+          <button data-act="stats">Profile &amp; Stats</button>
           <button data-act="settings">Settings</button>
           <button data-act="howto">How to Play</button>
         </div>
       </div>`;
+    if (this.resumeAvailable) {
+      this.root.querySelector('[data-act="resume"]').onclick = () => this.onResume();
+    }
     this.root.querySelector('[data-act="ai"]').onclick = () => this.renderAIConfig();
     this.root.querySelector('[data-act="pvp"]').onclick = () => this.renderPvPConfig();
+    this.root.querySelector('[data-act="stats"]').onclick = () => this.onNavigate('stats');
     this.root.querySelector('[data-act="settings"]').onclick = () => this.onNavigate('settings');
     this.root.querySelector('[data-act="howto"]').onclick = () => this.onNavigate('howto');
   }

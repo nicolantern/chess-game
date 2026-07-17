@@ -5,7 +5,9 @@ import { Menu } from './Menu.js';
 import { GameScreen } from './GameScreen.js';
 import { Settings } from './Settings.js';
 import { HowToPlay } from './HowToPlay.js';
+import { StatsScreen } from './StatsScreen.js';
 import { loadSettings } from '../utils/storage.js';
+import { loadInProgress } from '../utils/persistence.js';
 
 export class App {
   constructor(root) {
@@ -33,16 +35,25 @@ export class App {
     this._mount((screen) =>
       new Menu(screen, {
         onStart: (config) => this.showGame(config),
-        onNavigate: (dest) => (dest === 'settings' ? this.showSettings() : this.showHowTo()),
+        onNavigate: (dest) => this._navigate(dest),
+        resumeAvailable: Boolean(loadInProgress()),
+        onResume: () => this.showGame(null, loadInProgress()),
       }),
     );
   }
 
-  showGame(config) {
+  _navigate(dest) {
+    if (dest === 'settings') this.showSettings();
+    else if (dest === 'howto') this.showHowTo();
+    else if (dest === 'stats') this.showStats();
+  }
+
+  showGame(config, loadData = null) {
     this._mount(
       (screen) =>
         new GameScreen(screen, {
           config,
+          loadData,
           settings: this.settings,
           onExit: () => this.showMenu(),
         }),
@@ -62,5 +73,15 @@ export class App {
 
   showHowTo() {
     this._mount((screen) => new HowToPlay(screen, { onBack: () => this.showMenu() }));
+  }
+
+  showStats() {
+    this._mount(
+      (screen) =>
+        new StatsScreen(screen, {
+          onBack: () => this.showMenu(),
+          onReplay: (game) => this.showGame(null, game),
+        }),
+    );
   }
 }

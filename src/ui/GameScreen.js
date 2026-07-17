@@ -12,6 +12,21 @@ import { FLAGS } from '../engine/moves.js';
 import { WHITE, BLACK } from '../engine/pieces.js';
 import { parseFen } from '../engine/fen.js';
 import { inCheck } from '../engine/attacks.js';
+import { loadProfile, saveProfile, recordGame } from '../utils/profile.js';
+import { saveInProgress, clearInProgress } from '../utils/persistence.js';
+
+// Format ms as m:ss for the game-over summary.
+function fmtDuration(ms) {
+  const total = Math.round(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function dateStamp(ms) {
+  const d = new Date(ms);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
+}
 
 const GAMEOVER_TITLE = {
   checkmate: 'Checkmate',
@@ -24,18 +39,21 @@ const GAMEOVER_TITLE = {
 };
 
 export class GameScreen {
-  constructor(root, { config, settings, onExit }) {
+  constructor(root, { config, settings, onExit, loadData = null }) {
     this.root = root;
     this.config = config;
     this.settings = settings;
     this.onExit = onExit;
-    this.humanColor = config.humanColor ?? WHITE;
+    this.loadData = loadData; // a serialized game to resume or replay
+    this.humanColor = (config && config.humanColor) ?? WHITE;
     this.sound = new SoundManager({ enabled: settings.sound });
     this.animator = new Animator({ settings });
     this.promotion = new PromotionDialog();
     this.reviewPly = null; // null = live; otherwise a past position index
     this._keyHandler = (e) => this._onKey(e);
+    this._unloadHandler = () => this._autosave();
     document.addEventListener('keydown', this._keyHandler);
+    window.addEventListener('beforeunload', this._unloadHandler);
     this._build();
     this._startMatch();
   }
@@ -51,7 +69,14 @@ export class GameScreen {
   }
 
   _startMatch() {
-    this.controller = new MatchController(this.config);
+    // Fresh game, or reconstruct a resumed/replayed one from serialized data.
+    this.controller = this.loadData
+      ? MatchController.deserialize(this.loadData)
+      : new MatchController(this.config);
+    this.config = this.controller.startConfig; // so "New Game" reuses the setup
+    this.humanColor = this.config.humanColor ?? WHITE;
+    this.replayMode = Boolean(this.loadData) && this.controller.game.isOver;
+    this.savedThisGame = false;
     this.flipped = this.humanColor === BLACK; // put the human at the bottom
     this.boardArea.innerHTML = '';
 
@@ -73,7 +98,18 @@ export class GameScreen {
 
     this._wireController();
     this.board.render(this.controller.game.board);
-    this.controller.start();
+    this.sidebar._renderHistory();
+
+    if (this.controller.game.isOver) {
+      // Finished game (replay): show final position; review-only, no modal.
+      this.board.setInteractive(false);
+      this.board.setLastMove(this.controller.game.lastMove);
+      this._updateCheck();
+      this._seek(0); // start the replay from the beginning
+    } else {
+      this.controller.start();
+    }
+    this.loadData = null; // consumed
   }
 
   _wireController() {
@@ -115,6 +151,14 @@ export class GameScreen {
     this._updateCheck();
     this._syncInteractive();
     this._playSound(move);
+    this._autosave();
+  }
+
+  // Persist an unfinished game so it can be resumed later.
+  _autosave() {
+    if (!this.controller || this.controller.game.isOver) return;
+    if (this.controller.game.history.length === 0) return;
+    saveInProgress(this.controller.serialize());
   }
 
   // Interactive only when live, not game-over, and (in AI mode) on the human's turn.
@@ -262,6 +306,7 @@ export class GameScreen {
         break;
       case 'new':
         this.controller.destroy();
+        clearInProgress(); // abandon the old unfinished game
         this._removeModal();
         this._startMatch();
         break;
@@ -277,9 +322,17 @@ export class GameScreen {
   _onGameOver(s) {
     this.board.setInteractive(false);
     this.sound.play('game-end');
+    clearInProgress(); // the game is finished; nothing to resume
+    this._recordStats(s);
+
     let subtitle = '';
     if (s.status === 'stalemate' || s.status.startsWith('draw')) subtitle = 'The game is a draw.';
     else if (s.winner != null) subtitle = `${s.winner === WHITE ? 'White' : 'Black'} wins.`;
+
+    const durationMs = Date.now() - this.controller.startedAt;
+    const halfMoves = this.controller.game.history.length;
+    const avgMs = halfMoves ? durationMs / halfMoves : 0;
+    const meta = `Duration ${fmtDuration(durationMs)} · ${halfMoves} plies · avg ${(avgMs / 1000).toFixed(1)}s/move`;
 
     this._removeModal();
     this.modal = document.createElement('div');
@@ -288,14 +341,72 @@ export class GameScreen {
       <div class="modal">
         <h2>${GAMEOVER_TITLE[s.status] || 'Game Over'}</h2>
         <p>${subtitle}</p>
+        <p class="meta">${meta}</p>
         <div class="actions">
           <button data-act="menu">Menu</button>
+          <button data-act="save">★ Save Game</button>
           <button class="primary" data-act="new">New Game</button>
         </div>
       </div>`;
     this.modal.querySelector('[data-act="new"]').onclick = () => this._handleControl('new');
     this.modal.querySelector('[data-act="menu"]').onclick = () => this._handleControl('menu');
+    const saveBtn = this.modal.querySelector('[data-act="save"]');
+    saveBtn.onclick = () => {
+      this._saveGame(s);
+      saveBtn.textContent = '✓ Saved';
+      saveBtn.disabled = true;
+    };
     document.body.appendChild(this.modal);
+  }
+
+  // Fold the finished game into the player's lifetime statistics.
+  _recordStats(s) {
+    if (this.replayMode) return; // don't re-count a replayed saved game
+    const game = this.controller.game;
+    const mode = this.controller.mode;
+    let outcome = null;
+    if (mode === 'ai') {
+      if (s.winner == null) outcome = 'draw';
+      else outcome = s.winner === this.humanColor ? 'win' : 'loss';
+    }
+    const flawless =
+      outcome === 'win' && (this.controller.captured[this.humanColor] || []).length === 0;
+    const profile = loadProfile();
+    recordGame(profile, {
+      mode,
+      outcome,
+      aiLevel: this.controller.startConfig.aiLevel,
+      flawless,
+      mate: s.status === 'checkmate',
+      moveCount: Math.ceil(game.history.length / 2), // full moves
+      durationMs: Date.now() - this.controller.startedAt,
+      endedAt: Date.now(),
+    });
+  }
+
+  // Keep a finished game in the profile's saved-games list.
+  _saveGame(s) {
+    if (this.savedThisGame) return;
+    this.savedThisGame = true;
+    const profile = loadProfile();
+    const data = this.controller.serialize();
+    const level = this.controller.startConfig.aiLevel;
+    const label =
+      this.controller.mode === 'ai' ? `vs AI (${level})` : 'Local multiplayer';
+    const now = Date.now();
+    profile.savedGames.unshift({
+      id: now,
+      name: `${label} — ${GAMEOVER_TITLE[s.status] || 'Game'}`,
+      date: dateStamp(now),
+      result: data.result,
+      winner: data.winner,
+      sans: data.sans,
+      moves: data.moves,
+      startConfig: data.startConfig,
+    });
+    // Keep the list bounded.
+    profile.savedGames = profile.savedGames.slice(0, 50);
+    saveProfile(profile);
   }
 
   _removeModal() {
@@ -314,7 +425,9 @@ export class GameScreen {
   }
 
   destroy() {
+    this._autosave(); // preserve an unfinished game for resume
     document.removeEventListener('keydown', this._keyHandler);
+    window.removeEventListener('beforeunload', this._unloadHandler);
     this._removeModal();
     this.controller.destroy();
   }

@@ -11,13 +11,10 @@ import { pieceType, pieceColor, PAWN, WHITE } from '../engine/pieces.js';
 import { rankOf } from '../engine/board.js';
 
 export class MatchController {
-  constructor({
-    mode = 'pvp',
-    aiLevel = 'medium',
-    aiColor = 1,
-    timeMinutes = null,
-    time = null,
-  } = {}) {
+  constructor(opts = {}) {
+    const { mode = 'pvp', aiLevel = 'medium', aiColor = 1, timeMinutes = null, time = null } = opts;
+    this.startConfig = opts; // kept verbatim so a game can be serialized/resumed
+    this.startedAt = Date.now();
     this.bus = new EventBus();
     this.mode = mode; // 'pvp' | 'ai'
     this.aiColor = aiColor; // which side the AI plays in 'ai' mode
@@ -154,5 +151,47 @@ export class MatchController {
 
   destroy() {
     this.clock.stop();
+  }
+
+  /** Snapshot the whole game to a plain object (for save / resume / PGN). */
+  serialize() {
+    const result = this.game.isOver
+      ? this.game.status
+      : this.resigned != null
+        ? 'resign'
+        : 'in-progress';
+    return {
+      startConfig: this.startConfig,
+      moves: this.game.history.map((h) => ({
+        from: h.move.from,
+        to: h.move.to,
+        promotion: h.move.promotion || 0,
+      })),
+      sans: this.game.history.map((h) => h.san),
+      result,
+      winner: this.game.winner,
+      clock: { remaining: [...this.clock.remaining], unlimited: this.clock.unlimited },
+      startedAt: this.startedAt,
+      savedAt: Date.now(),
+    };
+  }
+
+  /** Rebuild a controller from a serialize() snapshot (resumes or replays). */
+  static deserialize(data) {
+    const mc = new MatchController(data.startConfig || {});
+    for (const m of data.moves || []) {
+      const legal = mc.game
+        .legalMoves()
+        .find((x) => x.from === m.from && x.to === m.to && (x.promotion || 0) === (m.promotion || 0));
+      if (!legal) break;
+      mc.game.applyMove(legal);
+      mc.fens.push(mc.game.fen());
+    }
+    mc._rebuildCaptured();
+    if (data.clock && !mc.clock.unlimited && Array.isArray(data.clock.remaining)) {
+      mc.clock.remaining = data.clock.remaining.slice();
+    }
+    if (data.startedAt) mc.startedAt = data.startedAt;
+    return mc;
   }
 }

@@ -602,6 +602,110 @@ label.num input {
   height: 100%;
 }
 
+/* --- Stats / profile ------------------------------------------------------ */
+.stats {
+  width: min(680px, 100%);
+  max-height: 82vh;
+  overflow-y: auto;
+}
+.name-input {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.7rem;
+  min-width: 180px;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.6rem;
+  margin: 1rem 0 0.5rem;
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.8rem;
+}
+.stat-tile .v {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--gold);
+}
+.stat-tile .l {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.level-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.5rem;
+}
+.level-table th,
+.level-table td {
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.level-table th {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.saved-game {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+}
+.saved-game .sg-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.saved-game .sg-info span {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+.saved-game .sg-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+.saved-game .sg-actions button {
+  padding: 0.4rem 0.7rem;
+}
+.pgn-text {
+  width: min(70vw, 520px);
+  height: 180px;
+  resize: vertical;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem;
+}
+.modal .meta {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: -0.2rem;
+}
+
 /* --- How to Play ---------------------------------------------------------- */
 .howto {
   width: min(720px, 100%);
@@ -646,7 +750,7 @@ label.num input {
   gap: 1.2rem;
   background: radial-gradient(1200px 800px at 70% -10%, #202a38 0%, #14181f 55%);
   color: #eef2f7;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.5s ease;
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 #loading.hide {

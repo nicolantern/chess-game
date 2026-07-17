@@ -15,13 +15,20 @@ and no network — it runs entirely offline.
 - **Play** — drag-and-drop or click-to-move, legal-move highlights, last-move
   and king-in-check highlights, board flip, undo, captured-piece trays with a
   material advantage, and a SAN move history.
-- **Clocks** — 1 / 3 / 5 / 10 / 15 / 30 minutes or unlimited.
+- **Board tools** — right-click to draw arrows and square highlights, review the
+  game with ← / → or by clicking any move, keyboard shortcuts, and fullscreen.
+- **Profiles & stats** — a player profile with lifetime W/L/D, per-difficulty
+  breakdown, streaks, averages, PGN export, replayable saved games, and
+  auto-save/resume of an unfinished game.
+- **Clocks** — Bullet / Blitz / Rapid / Classical presets, custom time, and
+  Fischer **increment** or simple **delay** — or unlimited.
 - **AI** — negamax with alpha-beta pruning, iterative deepening on a time
   budget, quiescence search, MVV-LVA + killer-move ordering, and an evaluation
   combining material, piece-square tables, king safety, mobility, and pawn
   structure.
-- **Presentation** — scalable SVG pieces, wood/marble board themes, smooth
-  animations, and synthesized sound effects.
+- **Presentation** — scalable SVG pieces, six board themes (wood, marble, green,
+  blue, coral, slate), smooth animations, a loading screen, and synthesized
+  sound effects.
 - **Settings** — toggle sound, highlights, and animations; pick a board theme.
   Persisted to `localStorage`.
 
