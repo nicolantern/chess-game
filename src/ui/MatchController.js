@@ -11,14 +11,24 @@ import { pieceType, pieceColor, PAWN, WHITE } from '../engine/pieces.js';
 import { rankOf } from '../engine/board.js';
 
 export class MatchController {
-  constructor({ mode = 'pvp', aiLevel = 'medium', aiColor = 1, timeMinutes = null } = {}) {
+  constructor({
+    mode = 'pvp',
+    aiLevel = 'medium',
+    aiColor = 1,
+    timeMinutes = null,
+    time = null,
+  } = {}) {
     this.bus = new EventBus();
     this.mode = mode; // 'pvp' | 'ai'
     this.aiColor = aiColor; // which side the AI plays in 'ai' mode
     this.ai = mode === 'ai' ? new ChessAI(aiLevel) : null;
     this.game = new Game();
+    // Accept either the newer `time` object or the legacy `timeMinutes` number.
+    const tc = time || { minutes: timeMinutes, increment: 0, delay: 0 };
     this.clock = new ChessClock({
-      minutes: timeMinutes,
+      minutes: tc.minutes,
+      increment: tc.increment || 0,
+      delay: tc.delay || 0,
       onTick: (remaining) => this.bus.emit('tick', remaining),
       onFlag: (side) => this._onFlag(side),
     });
@@ -91,7 +101,8 @@ export class MatchController {
     for (let i = 0; i < steps; i += 1) this.game.undo();
     this._rebuildCaptured();
     this.resigned = null;
-    if (!this.clock.unlimited) this.clock.switch(this.game.sideToMove);
+    // Don't grant increment when reverting a move.
+    if (!this.clock.unlimited) this.clock.switch(this.game.sideToMove, false);
     this.bus.emit('undo', null);
     this.bus.emit('status', this.statusPayload());
   }

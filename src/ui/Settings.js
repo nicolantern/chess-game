@@ -32,7 +32,7 @@ export class Settings {
         </div>`,
     ).join('');
 
-    const themes = ['wood', 'marble']
+    const themes = ['wood', 'marble', 'green', 'blue', 'coral', 'slate']
       .map(
         (t) =>
           `<button data-theme="${t}" class="${this.settings.theme === t ? 'selected' : ''}">${

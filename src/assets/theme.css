@@ -46,6 +46,26 @@ body.theme-marble {
   --sq-dark: #8b93a3;
   --board-frame: #4c5260;
 }
+body.theme-green {
+  --sq-light: #eeeed2;
+  --sq-dark: #769656;
+  --board-frame: #3f5233;
+}
+body.theme-blue {
+  --sq-light: #dee3e6;
+  --sq-dark: #4b7399;
+  --board-frame: #2f4a63;
+}
+body.theme-coral {
+  --sq-light: #f6dfd0;
+  --sq-dark: #c67f68;
+  --board-frame: #7a4536;
+}
+body.theme-slate {
+  --sq-light: #9aa4b2;
+  --sq-dark: #4a5568;
+  --board-frame: #2d3440;
+}
 
 * {
   box-sizing: border-box;
@@ -180,6 +200,48 @@ button.selected {
   justify-content: space-between;
   gap: 1rem;
 }
+/* Time-control picker */
+.time-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.tc-cat {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.tc-cat .tc-label {
+  flex: 0 0 68px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tc-cat .option-row {
+  flex: 1;
+}
+.custom-time {
+  margin-top: 0.7rem;
+}
+label.num {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  flex: 1 1 90px;
+}
+label.num input {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem;
+  width: 100%;
+}
+
 .actions {
   display: flex;
   gap: 0.6rem;

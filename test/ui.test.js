@@ -47,6 +47,31 @@ describe('ChessClock', () => {
   it('treats null minutes as unlimited', () => {
     expect(new ChessClock({ minutes: null }).unlimited).toBe(true);
   });
+
+  it('adds Fischer increment to the player who moved', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const clock = new ChessClock({ minutes: 1, increment: 5 });
+    clock.start(0);
+    vi.advanceTimersByTime(10000); // white uses 10s
+    expect(clock.remaining[0]).toBeLessThanOrEqual(50000);
+    clock.switch(1); // white completed a move -> +5s to white
+    expect(clock.remaining[0]).toBeGreaterThan(54000);
+    vi.useRealTimers();
+  });
+
+  it('does not deduct main time during the simple delay', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const clock = new ChessClock({ minutes: 1, delay: 3 });
+    clock.start(0);
+    vi.advanceTimersByTime(2000); // within the 3s delay
+    expect(clock.remaining[0]).toBe(60000);
+    vi.advanceTimersByTime(2000); // 1s past the delay
+    expect(clock.remaining[0]).toBeLessThanOrEqual(59000);
+    expect(clock.remaining[0]).toBeGreaterThan(58000);
+    vi.useRealTimers();
+  });
 });
 
 describe('MatchController', () => {

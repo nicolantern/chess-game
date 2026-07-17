@@ -1,27 +1,32 @@
 // Main menu and new-game configuration. Emits a start config
-// { mode, aiLevel, aiColor, timeMinutes } via onStart, or navigates to the
-// Settings / How-to-Play screens via onNavigate.
+// { mode, aiLevel, aiColor, humanColor, time } via onStart, or navigates to the
+// Settings / How-to-Play screens via onNavigate. `time` is
+// { minutes, increment, delay } (minutes null = unlimited).
 
 import { DIFFICULTY_LABELS } from '../ai/difficulty.js';
 import { WHITE, BLACK } from '../engine/pieces.js';
 
-export const TIME_CONTROLS = [
-  { label: '1 min', minutes: 1 },
-  { label: '3 min', minutes: 3 },
-  { label: '5 min', minutes: 5 },
-  { label: '10 min', minutes: 10 },
-  { label: '15 min', minutes: 15 },
-  { label: '30 min', minutes: 30 },
-  { label: 'Unlimited', minutes: null },
+// Preset time controls grouped by category. Each item is [label, minutes, increment].
+export const TIME_PRESETS = [
+  ['Bullet', [['1+0', 1, 0], ['2+1', 2, 1]]],
+  ['Blitz', [['3+0', 3, 0], ['3+2', 3, 2], ['5+0', 5, 0], ['5+3', 5, 3]]],
+  ['Rapid', [['10+0', 10, 0], ['10+5', 10, 5], ['15+10', 15, 10]]],
+  ['Classical', [['30+0', 30, 0], ['30+20', 30, 20]]],
 ];
+
+const presetKey = (m, i) => `${m}-${i}`;
 
 export class Menu {
   constructor(root, { onStart, onNavigate }) {
     this.root = root;
     this.onStart = onStart;
     this.onNavigate = onNavigate;
-    // Defaults for the configuration panels.
-    this.config = { aiLevel: 'medium', aiColor: BLACK, timeMinutes: null };
+    this.config = {
+      aiLevel: 'medium',
+      aiColorChoice: 'white',
+      timeKey: 'unlimited',
+      time: { minutes: null, increment: 0, delay: 0 },
+    };
     this.renderMain();
   }
 
@@ -43,28 +48,94 @@ export class Menu {
     this.root.querySelector('[data-act="howto"]').onclick = () => this.onNavigate('howto');
   }
 
-  // Reusable time-control chooser bound to this.config.timeMinutes.
+  // --- Time-control chooser (shared by both config panels) -----------------
   _timeField() {
-    const buttons = TIME_CONTROLS.map(
-      (tc) =>
-        `<button data-min="${tc.minutes}" class="${
-          this.config.timeMinutes === tc.minutes ? 'selected' : ''
-        }">${tc.label}</button>`,
-    ).join('');
-    return `<div class="field"><label>Time control</label><div class="option-row">${buttons}</div></div>`;
+    const key = this.config.timeKey;
+    const categories = TIME_PRESETS.map(([cat, items]) => {
+      const buttons = items
+        .map(
+          ([label, m, i]) =>
+            `<button data-tc="${presetKey(m, i)}" data-m="${m}" data-i="${i}" class="${
+              key === presetKey(m, i) ? 'selected' : ''
+            }">${label}</button>`,
+        )
+        .join('');
+      return `<div class="tc-cat"><span class="tc-label">${cat}</span><div class="option-row">${buttons}</div></div>`;
+    }).join('');
+
+    const c = this.config.time;
+    const customPanel = `
+      <div class="custom-time" ${key === 'custom' ? '' : 'hidden'}>
+        <div class="option-row">
+          <label class="num">Minutes<input type="number" min="0" max="180" step="1" data-cf="minutes" value="${
+            key === 'custom' ? c.minutes ?? 5 : 5
+          }"/></label>
+          <label class="num">Increment (s)<input type="number" min="0" max="60" step="1" data-cf="increment" value="${
+            key === 'custom' ? c.increment : 0
+          }"/></label>
+          <label class="num">Delay (s)<input type="number" min="0" max="60" step="1" data-cf="delay" value="${
+            key === 'custom' ? c.delay : 0
+          }"/></label>
+        </div>
+      </div>`;
+
+    return `
+      <div class="field">
+        <label>Time control</label>
+        <div class="time-presets">
+          ${categories}
+          <div class="tc-cat"><span class="tc-label">Other</span><div class="option-row">
+            <button data-tc="unlimited" class="${key === 'unlimited' ? 'selected' : ''}">Unlimited</button>
+            <button data-tc="custom" class="${key === 'custom' ? 'selected' : ''}">Custom…</button>
+          </div></div>
+        </div>
+        ${customPanel}
+      </div>`;
   }
 
   _bindTimeField() {
-    this.root.querySelectorAll('[data-min]').forEach((btn) => {
+    const selectButton = (btn) => {
+      this.root.querySelectorAll('[data-tc]').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+    this.root.querySelectorAll('[data-tc]').forEach((btn) => {
       btn.onclick = () => {
-        const v = btn.dataset.min;
-        this.config.timeMinutes = v === 'null' ? null : Number(v);
-        this.root.querySelectorAll('[data-min]').forEach((b) => b.classList.remove('selected'));
-        btn.classList.add('selected');
+        const tc = btn.dataset.tc;
+        this.config.timeKey = tc;
+        const panel = this.root.querySelector('.custom-time');
+        if (tc === 'unlimited') {
+          this.config.time = { minutes: null, increment: 0, delay: 0 };
+          if (panel) panel.hidden = true;
+        } else if (tc === 'custom') {
+          this._readCustom();
+          if (panel) panel.hidden = false;
+        } else {
+          this.config.time = { minutes: Number(btn.dataset.m), increment: Number(btn.dataset.i), delay: 0 };
+          if (panel) panel.hidden = true;
+        }
+        selectButton(btn);
       };
+    });
+    this.root.querySelectorAll('input[data-cf]').forEach((input) => {
+      input.oninput = () => this._readCustom();
     });
   }
 
+  _readCustom() {
+    const num = (sel, fallback) => {
+      const el = this.root.querySelector(`input[data-cf="${sel}"]`);
+      const v = el ? Number(el.value) : fallback;
+      return Number.isFinite(v) && v >= 0 ? v : fallback;
+    };
+    const minutes = num('minutes', 5);
+    this.config.time = {
+      minutes: minutes === 0 ? null : minutes, // 0 minutes = unlimited
+      increment: num('increment', 0),
+      delay: num('delay', 0),
+    };
+  }
+
+  // --- Play vs AI ----------------------------------------------------------
   renderAIConfig() {
     const levels = Object.entries(DIFFICULTY_LABELS)
       .map(
@@ -75,16 +146,14 @@ export class Menu {
       )
       .join('');
     const colors = [
-      ['white', WHITE, 'White'],
-      ['black', BLACK, 'Black'],
-      ['random', 'random', 'Random'],
+      ['white', 'White'],
+      ['black', 'Black'],
+      ['random', 'Random'],
     ]
       .map(
-        ([id, val, label]) =>
+        ([id, label]) =>
           `<button data-color="${id}" class="${
-            this.config.aiColorChoice === id || (!this.config.aiColorChoice && id === 'white')
-              ? 'selected'
-              : ''
+            this.config.aiColorChoice === id ? 'selected' : ''
           }">${label}</button>`,
       )
       .join('');
@@ -101,7 +170,6 @@ export class Menu {
         </div>
       </div>`;
 
-    this.config.aiColorChoice = this.config.aiColorChoice || 'white';
     this.root.querySelectorAll('[data-level]').forEach((btn) => {
       btn.onclick = () => {
         this.config.aiLevel = btn.dataset.level;
@@ -127,11 +195,12 @@ export class Menu {
         aiLevel: this.config.aiLevel,
         aiColor: humanColor ^ 1,
         humanColor,
-        timeMinutes: this.config.timeMinutes,
+        time: this.config.time,
       });
     };
   }
 
+  // --- Local multiplayer ---------------------------------------------------
   renderPvPConfig() {
     this.root.innerHTML = `
       <div class="panel">
@@ -146,7 +215,7 @@ export class Menu {
     this._bindTimeField();
     this.root.querySelector('[data-act="back"]').onclick = () => this.renderMain();
     this.root.querySelector('[data-act="start"]').onclick = () => {
-      this.onStart({ mode: 'pvp', humanColor: WHITE, timeMinutes: this.config.timeMinutes });
+      this.onStart({ mode: 'pvp', humanColor: WHITE, time: this.config.time });
     };
   }
 }
