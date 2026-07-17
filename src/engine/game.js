@@ -1,106 +1,152 @@
-import { createInitialBoard, fromIndex, toIndex } from './board.js';
-import { Color, PieceType, otherColor } from './pieces.js';
+// High-level game: wraps a Board with move history and derived status, and is
+// the API the UI talks to. It never contains movement rules itself — those live
+// in movegen/moves/rules — it only orchestrates them and tracks game outcome.
+
+import { parseFen, toFen, START_FEN } from './fen.js';
 import { generateLegalMoves } from './movegen.js';
-import { MoveFlag } from './moves.js';
+import { makeMove, unmakeMove } from './moves.js';
+import { toSan } from './notation.js';
+import { inCheck } from './attacks.js';
+import { isInsufficientMaterial } from './rules.js';
+
+// Terminal statuses (the game is over) vs in-progress ones.
+const TERMINAL = new Set([
+  'checkmate',
+  'stalemate',
+  'draw-insufficient',
+  'draw-fifty',
+  'draw-repetition',
+]);
 
 export class Game {
   constructor() {
-    this.board = createInitialBoard();
-    this.turn = Color.WHITE;
-    this.history = [];
-    this.status = 'ongoing';
-    this.check = false;
-    this.checkmate = false;
-    this.stalemate = false;
-    this.draw = false;
-    this.repetition = new Map();
-    this.halfmoveClock = 0;
-    this.moveNumber = 1;
-    this.captured = [];
-    this.lastMove = null;
+    this.reset(START_FEN);
   }
 
-  clone() {
-    const copy = new Game();
-    copy.board = this.board.map((row) => [...row]);
-    copy.turn = this.turn;
-    copy.history = this.history.map((move) => ({ ...move }));
-    copy.status = this.status;
-    copy.check = this.check;
-    copy.checkmate = this.checkmate;
-    copy.stalemate = this.stalemate;
-    copy.draw = this.draw;
-    copy.repetition = new Map(this.repetition);
-    copy.halfmoveClock = this.halfmoveClock;
-    copy.moveNumber = this.moveNumber;
-    copy.captured = [...this.captured];
-    copy.lastMove = this.lastMove ? { ...this.lastMove } : null;
-    return copy;
+  static fromFen(fen) {
+    const game = new Game();
+    game.reset(fen);
+    return game;
   }
 
-  getPiece(square) {
-    const index = toIndex(square);
-    const row = Math.floor(index / 8);
-    const col = index % 8;
-    const symbol = this.board[row][col];
-    if (!symbol) return null;
-    return { type: symbol.toLowerCase(), color: symbol === symbol.toUpperCase() ? Color.WHITE : Color.BLACK, symbol };
+  /** Reset to a position and recompute derived state. */
+  reset(fen) {
+    this.board = parseFen(fen);
+    this.history = []; // [{ move, san, captured }]
+    this.positionCounts = new Map(); // repetition key -> occurrences
+    this._recordPosition();
+    this._updateStatus();
   }
 
-  setPiece(square, piece) {
-    const index = toIndex(square);
-    const row = Math.floor(index / 8);
-    const col = index % 8;
-    this.board[row][col] = piece ? piece.symbol : null;
+  fen() {
+    return toFen(this.board);
   }
 
-  makeMove(move) {
-    const piece = this.getPiece(move.from);
-    if (!piece) return false;
-    const captured = this.getPiece(move.to);
-    this.setPiece(move.from, null);
-    this.setPiece(move.to, piece);
-    this.lastMove = { from: move.from, to: move.to, piece, captured, promotion: move.promotion };
-    this.history.push({ ...move, captured });
-    if (captured) {
-      this.captured.push(captured);
-      this.halfmoveClock = 0;
-    } else {
-      this.halfmoveClock += 1;
-    }
-    this.turn = otherColor(this.turn);
-    this.updateStatus();
+  get sideToMove() {
+    return this.board.sideToMove;
+  }
+
+  legalMoves() {
+    return generateLegalMoves(this.board);
+  }
+
+  legalMovesFrom(sq) {
+    return this.legalMoves().filter((m) => m.from === sq);
+  }
+
+  /**
+   * Attempt a move by squares (with an optional promotion type when a pawn
+   * reaches the last rank). Returns the applied move, or null if illegal.
+   */
+  moveByCoords(from, to, promotion = 0) {
+    const candidates = this.legalMoves().filter((m) => m.from === from && m.to === to);
+    if (candidates.length === 0) return null;
+    const move =
+      candidates.length > 1
+        ? candidates.find((m) => m.promotion === promotion) || candidates[0]
+        : candidates[0];
+    return this.applyMove(move);
+  }
+
+  /** Apply a fully-formed legal move object, updating history and status. */
+  applyMove(move) {
+    const san = toSan(this.board, move); // SAN must be built before the move
+    makeMove(this.board, move);
+    this.history.push({ move, san, captured: move._undo.captured });
+    this._recordPosition();
+    this._updateStatus();
+    return move;
+  }
+
+  /** Take back the most recent move. */
+  undo() {
+    const last = this.history.pop();
+    if (!last) return false;
+    this._unrecordPosition();
+    unmakeMove(this.board, last.move);
+    this._updateStatus();
     return true;
   }
 
-  undoMove() {
-    const previous = this.history.pop();
-    if (!previous) return false;
-    const piece = this.getPiece(previous.to);
-    this.setPiece(previous.to, null);
-    this.setPiece(previous.from, piece);
-    this.turn = otherColor(this.turn);
-    this.lastMove = null;
-    this.updateStatus();
-    return true;
+  get lastMove() {
+    return this.history.length ? this.history[this.history.length - 1].move : null;
   }
 
-  getLegalMoves() {
-    return generateLegalMoves(this.board, this.turn);
+  // Repetition is keyed on placement + side + castling + ep (clocks excluded).
+  _positionKey() {
+    return this.fen().split(' ').slice(0, 4).join(' ');
   }
 
-  updateStatus() {
-    const legalMoves = this.getLegalMoves();
-    this.check = false;
-    this.checkmate = false;
-    this.stalemate = false;
-    this.draw = false;
-    if (legalMoves.length === 0) {
-      this.checkmate = true;
-      this.stalemate = true;
-      this.status = 'checkmate';
+  _recordPosition() {
+    const key = this._positionKey();
+    this.positionCounts.set(key, (this.positionCounts.get(key) || 0) + 1);
+  }
+
+  _unrecordPosition() {
+    const key = this._positionKey();
+    const next = (this.positionCounts.get(key) || 1) - 1;
+    if (next <= 0) this.positionCounts.delete(key);
+    else this.positionCounts.set(key, next);
+  }
+
+  /** Recompute check/checkmate/stalemate/draw status and the winner. */
+  _updateStatus() {
+    const moves = this.legalMoves();
+    this.check = inCheck(this.board, this.sideToMove);
+
+    if (moves.length === 0) {
+      this.status = this.check ? 'checkmate' : 'stalemate';
+      this.winner = this.check ? this.sideToMove ^ 1 : null;
       return;
     }
-    this.status = 'ongoing';
+    if (isInsufficientMaterial(this.board)) {
+      this.status = 'draw-insufficient';
+      this.winner = null;
+      return;
+    }
+    if (this.board.halfmoveClock >= 100) {
+      this.status = 'draw-fifty';
+      this.winner = null;
+      return;
+    }
+    if ((this.positionCounts.get(this._positionKey()) || 0) >= 3) {
+      this.status = 'draw-repetition';
+      this.winner = null;
+      return;
+    }
+    this.status = this.check ? 'check' : 'playing';
+    this.winner = null;
+  }
+
+  /** A draw the side to move MAY claim (threefold / fifty-move) but isn't forced. */
+  get canClaimDraw() {
+    return (
+      (this.positionCounts.get(this._positionKey()) || 0) >= 3 ||
+      this.board.halfmoveClock >= 100
+    );
+  }
+
+  get isOver() {
+    return TERMINAL.has(this.status);
   }
 }
