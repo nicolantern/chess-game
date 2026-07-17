@@ -47,9 +47,19 @@ export class HowToPlay {
         <ul>
           <li><strong>Move</strong> — drag a piece, or click it and then click a highlighted square.</li>
           <li>Legal moves, the last move, and a king in check are highlighted.</li>
+          <li><strong>Annotate</strong> — right-click a square to highlight it, or right-drag between
+              two squares to draw an arrow. Left-click clears annotations.</li>
+          <li><strong>Review</strong> — click any move in the history, or use ← / → to step through
+              the game (Home = start, End = latest).</li>
           <li>Use <strong>Flip</strong> to rotate the board, <strong>Undo</strong> to take back a move,
               and the clocks for timed play.</li>
           <li>Toggle sound, highlights, animations, and the board theme in <strong>Settings</strong>.</li>
+        </ul>
+
+        <h3>Keyboard shortcuts</h3>
+        <ul>
+          <li><strong>← / →</strong> — step back / forward through moves; <strong>Home / End</strong> — jump to start / latest.</li>
+          <li><strong>F</strong> — flip board · <strong>Shift+F</strong> — fullscreen · <strong>U</strong> — undo · <strong>N</strong> — new game · <strong>Esc</strong> — exit review.</li>
         </ul>
 
         <div class="actions"><button class="primary" data-act="back">Back to Menu</button></div>

@@ -25,11 +25,12 @@ function formatTime(ms) {
 }
 
 export class Sidebar {
-  constructor(root, { controller, unlimited, onControl }) {
+  constructor(root, { controller, unlimited, onControl, onSeek }) {
     this.root = root;
     this.controller = controller;
     this.unlimited = unlimited;
     this.onControl = onControl;
+    this.onSeek = onSeek || (() => {});
     this.topColor = BLACK; // color shown on the top clock/tray
     this._build();
     this._wire();
@@ -50,12 +51,13 @@ export class Sidebar {
       <div class="history"><table></table></div>
       <div class="clock bottom"><span class="who"></span><span class="tray captured"></span><span class="time"></span></div>
       <div class="controls">
-        <button data-act="undo">↶ Undo</button>
-        <button data-act="flip">⇅ Flip</button>
+        <button data-act="undo" title="Undo (←/U)">↶ Undo</button>
+        <button data-act="flip" title="Flip board (F)">⇅ Flip</button>
         <button data-act="draw" disabled>½ Draw</button>
         <button data-act="resign">⚑ Resign</button>
-        <button data-act="new">↻ New Game</button>
-        <button data-act="menu">☰ Menu</button>
+        <button data-act="fullscreen" title="Fullscreen (Shift+F)">⛶ Fullscreen</button>
+        <button data-act="new" title="New game (N)">↻ New Game</button>
+        <button data-act="menu" title="Menu (Esc)">☰ Menu</button>
       </div>`;
     this.elTop = this.root.querySelector('.clock.top');
     this.elBottom = this.root.querySelector('.clock.bottom');
@@ -139,14 +141,25 @@ export class Sidebar {
       const num = i / 2 + 1;
       const white = sans[i] || '';
       const black = sans[i + 1] || '';
-      const isLastWhite = i === sans.length - 1;
-      const isLastBlack = i + 1 === sans.length - 1;
+      // data-ply is the position index (after that move) for click-to-review.
       rows += `<tr><td class="num">${num}.</td>` +
-        `<td class="mv ${isLastWhite ? 'current' : ''}">${white}</td>` +
-        `<td class="mv ${isLastBlack ? 'current' : ''}">${black}</td></tr>`;
+        `<td class="mv" data-ply="${i + 1}">${white}</td>` +
+        (black ? `<td class="mv" data-ply="${i + 2}">${black}</td>` : '<td></td>') +
+        '</tr>';
     }
     this.elHistory.innerHTML = rows;
+    this.elHistory.querySelectorAll('.mv[data-ply]').forEach((cell) => {
+      cell.onclick = () => this.onSeek(Number(cell.dataset.ply));
+    });
+    this.highlightPly(this.controller.game.history.length);
     const wrap = this.root.querySelector('.history');
     wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  /** Mark the move at `ply` (position index) as the current one being viewed. */
+  highlightPly(ply) {
+    this.elHistory.querySelectorAll('.mv').forEach((cell) => {
+      cell.classList.toggle('current', Number(cell.dataset.ply) === ply);
+    });
   }
 }

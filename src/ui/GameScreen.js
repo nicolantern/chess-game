@@ -10,7 +10,8 @@ import { PromotionDialog } from './PromotionDialog.js';
 import { SoundManager } from '../assets/audio.js';
 import { FLAGS } from '../engine/moves.js';
 import { WHITE, BLACK } from '../engine/pieces.js';
-import { algebraic } from '../engine/board.js';
+import { parseFen } from '../engine/fen.js';
+import { inCheck } from '../engine/attacks.js';
 
 const GAMEOVER_TITLE = {
   checkmate: 'Checkmate',
@@ -32,6 +33,9 @@ export class GameScreen {
     this.sound = new SoundManager({ enabled: settings.sound });
     this.animator = new Animator({ settings });
     this.promotion = new PromotionDialog();
+    this.reviewPly = null; // null = live; otherwise a past position index
+    this._keyHandler = (e) => this._onKey(e);
+    document.addEventListener('keydown', this._keyHandler);
     this._build();
     this._startMatch();
   }
@@ -62,8 +66,10 @@ export class GameScreen {
       controller: this.controller,
       unlimited: this.controller.clock.unlimited,
       onControl: (act) => this._handleControl(act),
+      onSeek: (ply) => this._seek(ply),
     });
     this.sidebar.setTopColor(this.flipped ? WHITE : BLACK);
+    this.reviewPly = null;
 
     this._wireController();
     this.board.render(this.controller.game.board);
@@ -101,20 +107,120 @@ export class GameScreen {
 
   _onMoved(move) {
     const game = this.controller.game;
+    this.reviewPly = null; // a new move snaps the view back to live
     this.board.render(game.board);
+    this.board.clearAnnotations();
     this.animator.slide(this.board, move.from, move.to);
     this.board.setLastMove(move);
     this._updateCheck();
+    this._syncInteractive();
     this._playSound(move);
   }
 
+  // Interactive only when live, not game-over, and (in AI mode) on the human's turn.
+  _syncInteractive() {
+    const game = this.controller.game;
+    const live = this.reviewPly === null;
+    const humansTurn =
+      this.controller.mode !== 'ai' || game.sideToMove === this.humanColor;
+    this.board.setInteractive(live && !game.isOver && humansTurn);
+  }
+
+  // --- History review ------------------------------------------------------
+  _seek(ply) {
+    const total = this.controller.game.history.length;
+    const target = Math.max(0, Math.min(ply, total));
+    if (target >= total) {
+      this._live();
+      return;
+    }
+    this.reviewPly = target;
+    const board = parseFen(this.controller.fens[target]);
+    this.board.render(board);
+    this.board.clearAnnotations();
+    const move = target > 0 ? this.controller.game.history[target - 1].move : null;
+    this.board.setLastMove(move);
+    this.board.setCheckSquare(inCheck(board, board.sideToMove) ? board.kings[board.sideToMove] : -1);
+    this.board.setInteractive(false);
+    this.sidebar.highlightPly(target);
+  }
+
+  _live() {
+    this.reviewPly = null;
+    const game = this.controller.game;
+    this.board.render(game.board);
+    this.board.setLastMove(game.lastMove);
+    this._updateCheck();
+    this._syncInteractive();
+    this.sidebar.highlightPly(game.history.length);
+  }
+
+  _step(delta) {
+    const current = this.reviewPly ?? this.controller.game.history.length;
+    this._seek(current + delta);
+  }
+
   _onUndo() {
+    this.reviewPly = null;
     const game = this.controller.game;
     this.board.render(game.board);
     this.board.clearSelection();
+    this.board.clearAnnotations();
     this.board.setLastMove(game.lastMove);
     this._updateCheck();
-    this.board.setInteractive(true);
+    this._syncInteractive();
+  }
+
+  // Keyboard shortcuts. Ignored while typing in a form field.
+  _onKey(e) {
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        this._step(-1);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        this._step(1);
+        break;
+      case 'Home':
+        e.preventDefault();
+        this._seek(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        this._live();
+        break;
+      case 'f':
+        this._handleControl('flip');
+        break;
+      case 'F': // Shift+F
+        this._toggleFullscreen();
+        break;
+      case 'u':
+      case 'U':
+        this._handleControl('undo');
+        break;
+      case 'n':
+      case 'N':
+        this._handleControl('new');
+        break;
+      case 'Escape':
+        if (this.reviewPly !== null) this._live();
+        else if (this.modal) this._removeModal();
+        break;
+      default:
+        break;
+    }
+  }
+
+  _toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    } catch {
+      /* fullscreen not permitted — ignore */
+    }
   }
 
   _updateCheck() {
@@ -147,6 +253,9 @@ export class GameScreen {
         break;
       case 'draw':
         this.controller.claimDraw();
+        break;
+      case 'fullscreen':
+        this._toggleFullscreen();
         break;
       case 'resign':
         this.controller.resign(this.controller.mode === 'ai' ? this.humanColor : this.controller.game.sideToMove);
@@ -205,6 +314,7 @@ export class GameScreen {
   }
 
   destroy() {
+    document.removeEventListener('keydown', this._keyHandler);
     this._removeModal();
     this.controller.destroy();
   }

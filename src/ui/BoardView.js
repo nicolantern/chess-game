@@ -2,8 +2,11 @@
 // plus click-to-move). It is a pure view: it never decides legality itself. It
 // asks its host for the legal targets of a picked-up piece and reports completed
 // moves back, so all rules stay in the engine.
+//
+// It also supports user annotations (right-drag to draw an arrow, right-click to
+// highlight a square) and rendering an arbitrary position for history review.
 
-import { onBoard, fileOf, rankOf, square, algebraic } from '../engine/board.js';
+import { fileOf, rankOf, square } from '../engine/board.js';
 import { pieceColor, pieceType } from '../engine/pieces.js';
 import { pieceSvg } from '../assets/pieces.js';
 
@@ -22,14 +25,15 @@ export class BoardView {
     this.settings = settings;
     this.flipped = false;
     this.interactive = true;
-    this.selected = -1; // selected source square, or -1
+    this.selected = -1;
     this.cells = new Map(); // 0x88 square -> cell element
-    this.lastMove = null; // { from, to }
+    this.visualIndex = new Map(); // 0x88 square -> 0..63 visual position
+    this.lastMove = null;
     this.checkSquare = -1;
+    this.annotations = { arrows: [], highlights: new Set() }; // user scratch marks
     this._build();
   }
 
-  // Squares in visual order (a8..h1 normally; reversed when flipped).
   _visualOrder() {
     const order = [];
     const ranks = this.flipped ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -43,34 +47,40 @@ export class BoardView {
     this.wrap.className = 'board-wrap';
     this.board = document.createElement('div');
     this.board.className = 'board';
+    // Annotation overlay (arrows). pointer-events disabled so clicks pass through.
+    this.overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    this.overlay.setAttribute('class', 'annotations');
+    this.overlay.setAttribute('viewBox', '0 0 100 100');
+    this.overlay.setAttribute('preserveAspectRatio', 'none');
+    this.overlay.innerHTML =
+      '<defs><marker id="ah" markerWidth="4" markerHeight="4" refX="2.2" refY="2" orient="auto">' +
+      '<path d="M0,0 L4,2 L0,4 z" fill="context-stroke"/></marker></defs>';
     this.wrap.appendChild(this.board);
     this.root.appendChild(this.wrap);
-    this._layout();
-    // Pointer handling is delegated from the board container.
+    this._layout(); // appends cells and (re)attaches the overlay inside .board
+
     this.board.addEventListener('pointerdown', (e) => this._onPointerDown(e));
+    this.board.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  // (Re)create the 64 cells in the current visual order.
   _layout() {
     this.board.textContent = '';
     this.cells.clear();
+    this.visualIndex.clear();
     const order = this._visualOrder();
-    for (const sq of order) {
+    order.forEach((sq, idx) => {
       const cell = document.createElement('div');
       const dark = (fileOf(sq) + rankOf(sq)) % 2 === 0;
       cell.className = `square ${dark ? 'dark' : 'light'}`;
       cell.dataset.sq = String(sq);
 
-      // Edge coordinate labels (files on the bottom row, ranks on the left col).
-      const isBottom = order.indexOf(sq) >= 56;
-      const isLeft = order.indexOf(sq) % 8 === 0;
-      if (isBottom) {
+      if (idx >= 56) {
         const f = document.createElement('span');
         f.className = 'coord file';
         f.textContent = 'abcdefgh'[fileOf(sq)];
         cell.appendChild(f);
       }
-      if (isLeft) {
+      if (idx % 8 === 0) {
         const r = document.createElement('span');
         r.className = 'coord rank';
         r.textContent = String(rankOf(sq) + 1);
@@ -78,7 +88,11 @@ export class BoardView {
       }
       this.board.appendChild(cell);
       this.cells.set(sq, cell);
-    }
+      this.visualIndex.set(sq, idx);
+    });
+    // The annotation overlay lives inside .board so its 0-100 viewBox maps
+    // exactly onto the 8x8 grid regardless of board size.
+    this.board.appendChild(this.overlay);
   }
 
   setFlipped(value) {
@@ -86,13 +100,13 @@ export class BoardView {
     this._layout();
     if (this._lastBoard) this.render(this._lastBoard);
     this._reapplyHighlights();
+    this._renderAnnotations();
   }
 
   setInteractive(value) {
     this.interactive = value;
   }
 
-  /** Draw all pieces for the given engine Board. */
   render(engineBoard) {
     this._lastBoard = engineBoard;
     for (const [sq, cell] of this.cells) {
@@ -120,13 +134,11 @@ export class BoardView {
 
   _showTargets(from) {
     if (!this.settings.highlights) return;
-    const cellFrom = this.cells.get(from);
-    if (cellFrom) cellFrom.classList.add('sel');
+    this.cells.get(from)?.classList.add('sel');
     for (const to of this.legalTargetsFor(from)) {
       const cell = this.cells.get(to);
       if (!cell) continue;
-      const occupied = this._lastBoard && this._lastBoard.squares[to];
-      if (occupied) cell.classList.add('capture-target');
+      if (this._lastBoard && this._lastBoard.squares[to]) cell.classList.add('capture-target');
       const dot = document.createElement('span');
       dot.className = 'dot';
       cell.appendChild(dot);
@@ -152,6 +164,43 @@ export class BoardView {
     if (this.checkSquare >= 0) this.cells.get(this.checkSquare)?.classList.add('check');
   }
 
+  // --- Annotations (right-click) -------------------------------------------
+  clearAnnotations() {
+    this.annotations = { arrows: [], highlights: new Set() };
+    this._renderAnnotations();
+  }
+
+  _center(sq) {
+    const idx = this.visualIndex.get(sq);
+    const col = idx % 8;
+    const row = Math.floor(idx / 8);
+    return { x: (col + 0.5) * 12.5, y: (row + 0.5) * 12.5 };
+  }
+
+  _renderAnnotations() {
+    // Square highlights.
+    for (const cell of this.cells.values()) cell.classList.remove('annot');
+    for (const sq of this.annotations.highlights) this.cells.get(sq)?.classList.add('annot');
+    // Arrows.
+    const defs = this.overlay.querySelector('defs').outerHTML;
+    let lines = '';
+    for (const { from, to } of this.annotations.arrows) {
+      const a = this._center(from);
+      const b = this._center(to);
+      // Shorten the arrow slightly so the head sits inside the target square.
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const bx = b.x - (dx / len) * 4;
+      const by = b.y - (dy / len) * 4;
+      lines +=
+        `<line x1="${a.x}" y1="${a.y}" x2="${bx}" y2="${by}" ` +
+        `stroke="#f0a020" stroke-width="2.2" stroke-linecap="round" ` +
+        `marker-end="url(#ah)" opacity="0.85"/>`;
+    }
+    this.overlay.innerHTML = defs + lines;
+  }
+
   // --- Input ---------------------------------------------------------------
   _squareFromEvent(e) {
     const el = e.target.closest('.square');
@@ -159,11 +208,19 @@ export class BoardView {
   }
 
   _onPointerDown(e) {
+    // Right button: draw annotations (works whether or not it's the player's turn).
+    if (e.button === 2) {
+      e.preventDefault();
+      this._beginAnnotation(e);
+      return;
+    }
+    // Any left click clears annotations.
+    if (this.annotations.arrows.length || this.annotations.highlights.size) this.clearAnnotations();
+
     if (!this.interactive) return;
     const sq = this._squareFromEvent(e);
     if (sq < 0) return;
 
-    // Completing a move onto a legal target of the current selection.
     if (this.selected >= 0 && this.legalTargetsFor(this.selected).includes(sq)) {
       const from = this.selected;
       this.clearSelection();
@@ -171,7 +228,6 @@ export class BoardView {
       return;
     }
 
-    // Otherwise try to pick up the piece on this square.
     const targets = this.legalTargetsFor(sq);
     this.clearSelection();
     if (targets.length === 0) return;
@@ -181,7 +237,30 @@ export class BoardView {
     this._beginDrag(e, sq);
   }
 
-  // Drag a floating clone of the piece so it can be dropped on a target square.
+  // Right-drag: draw an arrow; right-click without moving: toggle a highlight.
+  _beginAnnotation(e) {
+    const from = this._squareFromEvent(e);
+    if (from < 0) return;
+    const up = (ev) => {
+      window.removeEventListener('pointerup', up);
+      const target = document.elementFromPoint(ev.clientX, ev.clientY);
+      const cell = target && target.closest('.square');
+      const to = cell ? Number(cell.dataset.sq) : from;
+      if (to === from) {
+        // toggle square highlight
+        if (this.annotations.highlights.has(from)) this.annotations.highlights.delete(from);
+        else this.annotations.highlights.add(from);
+      } else {
+        // toggle arrow (remove if it already exists)
+        const i = this.annotations.arrows.findIndex((ar) => ar.from === from && ar.to === to);
+        if (i >= 0) this.annotations.arrows.splice(i, 1);
+        else this.annotations.arrows.push({ from, to });
+      }
+      this._renderAnnotations();
+    };
+    window.addEventListener('pointerup', up);
+  }
+
   _beginDrag(e, from) {
     const cell = this.cells.get(from);
     const pieceEl = cell?.querySelector('.piece');
@@ -219,7 +298,6 @@ export class BoardView {
         this.clearSelection();
         this.onMove(from, to);
       }
-      // If not a valid drop, selection stays so click-to-move still works.
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);

@@ -35,6 +35,8 @@ export class MatchController {
     // Captured pieces, grouped by the color of the captured piece.
     this.captured = { [WHITE]: [], [1]: [] };
     this.resigned = null;
+    // FEN snapshot after each ply (index 0 = initial), for history review.
+    this.fens = [this.game.fen()];
   }
 
   static fromFen(fen, opts) {
@@ -76,6 +78,7 @@ export class MatchController {
   _afterMove() {
     const last = this.game.history[this.game.history.length - 1];
     if (last.captured) this.captured[pieceColor(last.captured)].push(last.captured);
+    this.fens.push(this.game.fen());
     this.clock.switch(this.game.sideToMove);
     this.bus.emit('move', { move: last.move, san: last.san });
     this.bus.emit('status', this.statusPayload());
@@ -99,6 +102,7 @@ export class MatchController {
     if (!this.game.history.length) return;
     const steps = this.mode === 'ai' ? Math.min(2, this.game.history.length) : 1;
     for (let i = 0; i < steps; i += 1) this.game.undo();
+    this.fens.length = this.game.history.length + 1;
     this._rebuildCaptured();
     this.resigned = null;
     // Don't grant increment when reverting a move.
