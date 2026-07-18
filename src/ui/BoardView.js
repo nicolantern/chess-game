@@ -65,8 +65,16 @@ export class BoardView {
     this.overlay.setAttribute('viewBox', '0 0 100 100');
     this.overlay.setAttribute('preserveAspectRatio', 'none');
     this.overlay.innerHTML =
-      '<defs><marker id="ah" markerWidth="4" markerHeight="4" refX="2.2" refY="2" orient="auto">' +
-      '<path d="M0,0 L4,2 L0,4 z" fill="context-stroke"/></marker></defs>';
+      '<defs>' +
+      // Annotation arrowhead: scales with the line thickness (default strokeWidth units).
+      '<marker id="ah" markerWidth="4" markerHeight="4" refX="2.2" refY="2" orient="auto">' +
+      '<path d="M0,0 L4,2 L0,4 z" fill="context-stroke"/></marker>' +
+      // Hint arrowhead: a fixed size (userSpaceOnUse) so it stays compact even when
+      // the hint line is drawn thick.
+      '<marker id="ah-hint" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" ' +
+      'refX="3.2" refY="3" orient="auto">' +
+      '<path d="M0,0 L6,3 L0,6 z" fill="context-stroke"/></marker>' +
+      '</defs>';
     this.wrap.appendChild(this.board);
     this.root.appendChild(this.wrap);
     this._layout(); // appends cells and (re)attaches the overlay inside .board
@@ -199,24 +207,41 @@ export class BoardView {
     for (const arrow of this.annotations.arrows) {
       const a = this._center(arrow.from);
       const b = this._center(arrow.to);
-      // Shorten the arrow slightly so the head sits inside the target square.
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const bx = b.x - (dx / len) * 4;
-      const by = b.y - (dy / len) * 4;
+      // Hint arrows (drawn programmatically) use a thick line but a fixed-size
+      // arrowhead (marker #ah-hint), so the line reads bold while the head stays
+      // compact. User annotation arrows keep the stroke-scaled head (#ah).
+      const width = arrow.hint ? 2.8 : 2.2;
+      const shorten = arrow.hint ? 3.5 : 4;
+      const head = arrow.hint ? 'ah-hint' : 'ah';
       const color = arrow.color || '#f0a020';
-      lines +=
-        `<line x1="${a.x}" y1="${a.y}" x2="${bx}" y2="${by}" ` +
-        `stroke="${color}" stroke-width="2.2" stroke-linecap="round" ` +
-        `marker-end="url(#ah)" opacity="0.85"/>`;
+
+      // Knight moves bend into an L (like chess.com): travel the long leg first,
+      // then turn the short leg into the target square. Everything else stays straight.
+      const df = Math.abs(fileOf(arrow.to) - fileOf(arrow.from));
+      const dr = Math.abs(rankOf(arrow.to) - rankOf(arrow.from));
+      const knight = (df === 1 && dr === 2) || (df === 2 && dr === 1);
+      const corner = knight ? (df > dr ? { x: b.x, y: a.y } : { x: a.x, y: b.y }) : a;
+
+      // Shorten the final leg so the head sits inside the target square (scaled to width).
+      const dx = b.x - corner.x;
+      const dy = b.y - corner.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const bx = b.x - (dx / len) * shorten;
+      const by = b.y - (dy / len) * shorten;
+
+      const stroke =
+        `stroke="${color}" stroke-width="${width}" stroke-linecap="round" ` +
+        `stroke-linejoin="round" marker-end="url(#${head})" opacity="0.85"`;
+      lines += knight
+        ? `<polyline points="${a.x},${a.y} ${corner.x},${corner.y} ${bx},${by}" fill="none" ${stroke}/>`
+        : `<line x1="${a.x}" y1="${a.y}" x2="${bx}" y2="${by}" ${stroke}/>`;
     }
     this.overlay.innerHTML = defs + lines;
   }
 
   /** Draw a programmatic arrow (e.g. a move hint) in a distinct color. */
   drawArrow(from, to, color = '#3fb37f') {
-    this.annotations.arrows.push({ from, to, color });
+    this.annotations.arrows.push({ from, to, color, hint: true });
     this._renderAnnotations();
   }
 
