@@ -16,8 +16,10 @@ export class MatchController {
     this.startConfig = opts; // kept verbatim so a game can be serialized/resumed
     this.startedAt = Date.now();
     this.bus = new EventBus();
-    this.mode = mode; // 'pvp' | 'ai'
+    this.mode = mode; // 'pvp' | 'ai' | 'online'
     this.aiColor = aiColor; // which side the AI plays in 'ai' mode
+    this.myColor = opts.myColor ?? null; // the local player's color in 'online' mode
+    this.opponentName = opts.opponentName || 'Opponent';
     this.ai = mode === 'ai' ? new ChessAI(aiLevel) : null;
     this.game = new Game();
     // Accept either the newer `time` object or the legacy `timeMinutes` number.
@@ -65,11 +67,39 @@ export class MatchController {
   tryMove(from, to, promotion = 0) {
     if (this.game.isOver) return false;
     if (this._aiToMove()) return false; // not the human's turn
+    // Online: you may only move your own colour on your turn.
+    if (this.mode === 'online' && this.game.sideToMove !== this.myColor) return false;
     const move = this.game.moveByCoords(from, to, promotion);
     if (!move) return false;
     this._afterMove();
     if (this._aiToMove()) this._scheduleAI();
     return true;
+  }
+
+  /** Apply a move received from the online opponent. Returns true if applied. */
+  applyRemoteMove(coords, clockRemaining) {
+    if (this.game.isOver) return false;
+    const legal = this.game
+      .legalMoves()
+      .find(
+        (m) =>
+          m.from === coords.from &&
+          m.to === coords.to &&
+          (m.promotion || 0) === (coords.promotion || 0),
+      );
+    if (!legal) return false; // illegal/desync — ignore
+    this.game.applyMove(legal);
+    if (clockRemaining && !this.clock.unlimited && Array.isArray(clockRemaining)) {
+      this.clock.remaining = clockRemaining.slice();
+    }
+    this._afterMove();
+    return true;
+  }
+
+  /** Force the game to end (online resign / draw agreed / opponent left). */
+  endGame(status, winner) {
+    this.clock.stop();
+    this.bus.emit('gameover', { ...this.statusPayload(), status, winner });
   }
 
   _afterMove() {

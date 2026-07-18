@@ -16,6 +16,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { getUser, createUser, setProfile } from './store.js';
+import { attachRealtime } from './realtime.js';
 
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-insecure-secret-change-me';
@@ -96,6 +97,10 @@ app.put('/api/profile', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[chess-server] listening on http://localhost:${PORT}`);
 });
+
+// Attach the real-time (online multiplayer) WebSocket server on /ws.
+attachRealtime(server, JWT_SECRET);
+

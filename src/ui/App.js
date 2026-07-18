@@ -7,10 +7,12 @@ import { Settings } from './Settings.js';
 import { HowToPlay } from './HowToPlay.js';
 import { StatsScreen } from './StatsScreen.js';
 import { AccountScreen } from './AccountScreen.js';
+import { OnlineScreen } from './OnlineScreen.js';
 import { loadSettings } from '../utils/storage.js';
 import { loadInProgress } from '../utils/persistence.js';
-import { isLoggedIn, currentUser, clearSession } from '../utils/session.js';
+import { isLoggedIn, currentUser, clearSession, getToken } from '../utils/session.js';
 import { initSync, pullProfile } from '../utils/sync.js';
+import { Realtime } from '../utils/realtime.js';
 
 export class App {
   constructor(root) {
@@ -61,6 +63,7 @@ export class App {
     else if (dest === 'howto') this.showHowTo();
     else if (dest === 'stats') this.showStats();
     else if (dest === 'account') this.showAccount();
+    else if (dest === 'online') this.showOnline();
   }
 
   showAccount() {
@@ -71,6 +74,52 @@ export class App {
           onBack: () => this.showMenu(),
         }),
     );
+  }
+
+  // Enter online mode: open the realtime connection, then matchmaking. A single
+  // 'matched' handler (re)mounts the game for both the first match and rematches.
+  async showOnline() {
+    this._endOnline(); // tidy any prior session
+    this.realtime = new Realtime();
+    try {
+      await this.realtime.connect(getToken());
+    } catch {
+      this.realtime = null;
+      this.showMenu();
+      alert('Could not reach the game server. Start it with "npm run server".');
+      return;
+    }
+    this.realtime.on('matched', (info) => this._showOnlineGame(info));
+    this._mount((screen) => new OnlineScreen(screen, {
+      realtime: this.realtime,
+      onCancel: () => this._endOnline(),
+    }));
+  }
+
+  _showOnlineGame(info) {
+    this._mount(
+      (screen) =>
+        new GameScreen(screen, {
+          config: {
+            mode: 'online',
+            myColor: info.color,
+            opponentName: info.opponent,
+            time: info.time,
+            realtime: this.realtime,
+          },
+          settings: this.settings,
+          onExit: () => this._endOnline(),
+        }),
+    );
+  }
+
+  _endOnline() {
+    if (this.realtime) {
+      this.realtime.leave();
+      this.realtime.close();
+      this.realtime = null;
+    }
+    this.showMenu();
   }
 
   showGame(config, loadData = null) {

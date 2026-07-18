@@ -44,6 +44,7 @@ export class StatsScreen {
       tile('Fastest mate', s.fastestMateMoves != null ? `${s.fastestMateMoves} moves` : '—'),
       tile('Avg duration', avgDur),
       tile('Avg moves', avgMoves),
+      tile('Online W/L/D', `${s.onlineWins || 0}/${s.onlineLosses || 0}/${s.onlineDraws || 0}`),
     ].join('');
 
     const levelRows = Object.entries(DIFFICULTY_LABELS)

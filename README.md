@@ -22,6 +22,10 @@ and no network — it runs entirely offline.
   export, replayable saved games, and auto-save/resume of an unfinished game.
 - **Optional accounts** — sign up / log in to sync your profile across devices
   (see below); fully offline and local-only when logged out.
+- **Online multiplayer** — once logged in, **Play Online** matches you with
+  another player by time control for a live, real-time game (moves + clocks
+  synced over WebSockets), with resign, draw offers, rematch, and
+  opponent-disconnect handling.
 - **Analysis & hints** — a best-move **hint** arrow, and post-game **analysis**
   giving each side an accuracy % and per-move symbols (‼ brilliant, ?! / ? / ??
   for inaccuracies, mistakes, and blunders).
@@ -68,7 +72,10 @@ local-only — no feature is lost.
 
 **How it works:** Express + a small JSON file store (`server/data.json`),
 passwords hashed with bcrypt, stateless JWT sessions. The server only stores an
-opaque profile blob — it never needs to understand chess.
+opaque profile blob — it never needs to understand chess. **Online multiplayer**
+adds a WebSocket layer (`/ws`) that authenticates with the same JWT, matchmakes
+by time control, and relays moves between the two players (each client runs the
+identical engine; server-side move validation is a planned hardening).
 
 **Deploying for real cross-device sync:** host `server/` somewhere (Render,
 Railway, Fly, a VPS…), set a strong `JWT_SECRET`, then build the frontend with

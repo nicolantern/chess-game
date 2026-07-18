@@ -36,8 +36,10 @@ const GAMEOVER_TITLE = {
   'draw-insufficient': 'Draw',
   'draw-fifty': 'Draw',
   'draw-repetition': 'Draw',
+  'draw-agreed': 'Draw Agreed',
   timeout: 'Time Out',
   resign: 'Resignation',
+  abandoned: 'Opponent Left',
 };
 
 export class GameScreen {
@@ -47,6 +49,9 @@ export class GameScreen {
     this.settings = settings;
     this.onExit = onExit;
     this.loadData = loadData; // a serialized game to resume or replay
+    this.online = Boolean(config && config.mode === 'online');
+    this.realtime = config && config.realtime; // WebSocket client in online mode
+    this._rtOff = []; // realtime unsubscribe functions
     this.humanColor = (config && config.humanColor) ?? WHITE;
     this.sound = new SoundManager({ enabled: settings.sound });
     this.animator = new Animator({ settings });
@@ -76,7 +81,8 @@ export class GameScreen {
       ? MatchController.deserialize(this.loadData)
       : new MatchController(this.config);
     this.config = this.controller.startConfig; // so "New Game" reuses the setup
-    this.humanColor = this.config.humanColor ?? WHITE;
+    // Online: the local player's colour comes from the match; otherwise humanColor.
+    this.humanColor = this.online ? this.config.myColor ?? WHITE : this.config.humanColor ?? WHITE;
     this.replayMode = Boolean(this.loadData) && this.controller.game.isOver;
     this.savedThisGame = false;
     this.flipped = this.humanColor === BLACK; // put the human at the bottom
@@ -99,6 +105,7 @@ export class GameScreen {
     this.reviewPly = null;
 
     this._wireController();
+    if (this.online) this._setupOnline();
     this.board.render(this.controller.game.board);
     this.sidebar._renderHistory();
 
@@ -125,21 +132,35 @@ export class GameScreen {
   // Destination squares a human is allowed to move a piece from `sq` to.
   _legalTargets(sq) {
     if (this.controller.game.isOver) return [];
-    // In AI mode, only let the human move their own pieces on their turn.
-    if (this.controller.mode === 'ai' && this.controller.game.sideToMove !== this.humanColor) return [];
+    // In AI/online mode, only let the local player move their own pieces on their turn.
+    if (
+      (this.controller.mode === 'ai' || this.online) &&
+      this.controller.game.sideToMove !== this.humanColor
+    ) {
+      return [];
+    }
     return this.controller.game.legalMovesFrom(sq).map((m) => m.to);
   }
 
   async _handleMove(from, to) {
+    let ok;
     if (this.controller.isPromotion(from, to)) {
       const type = await this.promotion.choose(this.controller.game.sideToMove);
       if (!type) {
         this.board.render(this.controller.game.board); // restore dragged piece
         return;
       }
-      this.controller.tryMove(from, to, type);
+      ok = this.controller.tryMove(from, to, type);
     } else {
-      this.controller.tryMove(from, to);
+      ok = this.controller.tryMove(from, to);
+    }
+    // Online: relay the move we just made (with our clock) to the opponent.
+    if (ok && this.online) {
+      const last = this.controller.game.history[this.controller.game.history.length - 1].move;
+      this.realtime.move(
+        { from: last.from, to: last.to, promotion: last.promotion || 0 },
+        this.controller.clock.remaining.slice(),
+      );
     }
   }
 
@@ -156,20 +177,21 @@ export class GameScreen {
     this._autosave();
   }
 
-  // Persist an unfinished game so it can be resumed later.
+  // Persist an unfinished game so it can be resumed later (not for online games).
   _autosave() {
+    if (this.online) return;
     if (!this.controller || this.controller.game.isOver) return;
     if (this.controller.game.history.length === 0) return;
     saveInProgress(this.controller.serialize());
   }
 
-  // Interactive only when live, not game-over, and (in AI mode) on the human's turn.
+  // Interactive only when live, not game-over, and (AI/online) on the local player's turn.
   _syncInteractive() {
     const game = this.controller.game;
     const live = this.reviewPly === null;
-    const humansTurn =
-      this.controller.mode !== 'ai' || game.sideToMove === this.humanColor;
-    this.board.setInteractive(live && !game.isOver && humansTurn);
+    const myTurn =
+      (this.controller.mode !== 'ai' && !this.online) || game.sideToMove === this.humanColor;
+    this.board.setInteractive(live && !game.isOver && myTurn);
   }
 
   // --- History review ------------------------------------------------------
@@ -324,7 +346,12 @@ export class GameScreen {
         this.sidebar.setTopColor(this.flipped ? WHITE : BLACK);
         break;
       case 'draw':
-        this.controller.claimDraw();
+        if (this.online) {
+          this.realtime.offerDraw();
+          this.sidebar.setMessage('Draw offered…');
+        } else {
+          this.controller.claimDraw();
+        }
         break;
       case 'fullscreen':
         this._toggleFullscreen();
@@ -336,7 +363,14 @@ export class GameScreen {
         this._analyze();
         break;
       case 'resign':
-        this.controller.resign(this.controller.mode === 'ai' ? this.humanColor : this.controller.game.sideToMove);
+        if (this.online) {
+          this.realtime.resign();
+          this.controller.endGame('resign', this.humanColor ^ 1); // I resign → opponent wins
+        } else {
+          this.controller.resign(
+            this.controller.mode === 'ai' ? this.humanColor : this.controller.game.sideToMove,
+          );
+        }
         break;
       case 'new':
         this.controller.destroy();
@@ -354,6 +388,10 @@ export class GameScreen {
   }
 
   _onGameOver(s) {
+    if (this.online) {
+      this._onOnlineGameOver(s);
+      return;
+    }
     this.board.setInteractive(false);
     this.sound.play('game-end');
     clearInProgress(); // the game is finished; nothing to resume
@@ -399,6 +437,50 @@ export class GameScreen {
       saveBtn.disabled = true;
     };
     document.body.appendChild(this.modal);
+  }
+
+  // Game-over handling for online games: record the online result and offer a
+  // rematch. The realtime connection stays open so a rematch can start.
+  _onOnlineGameOver(s) {
+    this.board.setInteractive(false);
+    this.sound.play('game-end');
+    this._recordOnlineStats(s);
+
+    let subtitle = '';
+    if (s.status === 'stalemate' || s.status.startsWith('draw')) subtitle = 'The game is a draw.';
+    else if (s.status === 'abandoned') subtitle = `${this.controller.opponentName} left — you win.`;
+    else if (s.winner != null) {
+      const iWon = s.winner === this.humanColor;
+      subtitle = iWon ? 'You win!' : `${this.controller.opponentName} wins.`;
+    }
+
+    this._removeModal();
+    this.modal = document.createElement('div');
+    this.modal.className = 'modal-backdrop';
+    this.modal.innerHTML = `
+      <div class="modal">
+        <h2>${GAMEOVER_TITLE[s.status] || 'Game Over'}</h2>
+        <p>${subtitle}</p>
+        <div class="actions">
+          <button data-act="menu">Leave</button>
+          <button class="primary" data-act="rematch">Rematch</button>
+        </div>
+      </div>`;
+    this.modal.querySelector('[data-act="menu"]').onclick = () => this._handleControl('menu');
+    const rematchBtn = this.modal.querySelector('[data-act="rematch"]');
+    rematchBtn.onclick = () => {
+      this.realtime.rematchOffer();
+      rematchBtn.textContent = 'Waiting for opponent…';
+      rematchBtn.disabled = true;
+    };
+    document.body.appendChild(this.modal);
+  }
+
+  _recordOnlineStats(s) {
+    let outcome = 'draw';
+    if (s.winner != null) outcome = s.winner === this.humanColor ? 'win' : 'loss';
+    const profile = loadProfile();
+    recordGame(profile, { mode: 'online', outcome, moveCount: 0, durationMs: 0, endedAt: Date.now() });
   }
 
   // Fold the finished game into the player's lifetime statistics. Returns
@@ -472,6 +554,68 @@ export class GameScreen {
     }
   }
 
+  // --- Online play ---------------------------------------------------------
+  _setupOnline() {
+    const rt = this.realtime;
+    // Hide controls that don't apply to online play.
+    ['undo', 'hint', 'new'].forEach((a) => {
+      const btn = this.sidebarEl.querySelector(`[data-act="${a}"]`);
+      if (btn) btn.style.display = 'none';
+    });
+    this.sidebar.setMessage(`🌐 Online — vs ${this.controller.opponentName}`);
+    this._rtOff.push(
+      rt.on('move', (m) => this.controller.applyRemoteMove(m.move, m.clock)),
+      rt.on('resign', () => this.controller.endGame('resign', this.humanColor)), // opp resigned → I win
+      rt.on('drawOffer', () => this._promptDraw()),
+      rt.on('drawAccept', () => this.controller.endGame('draw-agreed', null)),
+      rt.on('drawDecline', () => this.sidebar.setMessage('Draw declined.')),
+      rt.on('rematchOffer', () => this._promptRematch()),
+      rt.on('opponentLeft', () => this.controller.endGame('abandoned', this.humanColor)),
+      rt.on('close', () => {
+        if (!this.controller.game.isOver) this.controller.endGame('abandoned', this.humanColor);
+      }),
+    );
+  }
+
+  // A small yes/no modal used for draw and rematch offers.
+  _prompt(title, onYes, yesLabel = 'Accept', noLabel = 'Decline') {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>${title}</h2>
+        <div class="actions">
+          <button data-p="no">${noLabel}</button>
+          <button class="primary" data-p="yes">${yesLabel}</button>
+        </div>
+      </div>`;
+    const close = () => backdrop.remove();
+    backdrop.querySelector('[data-p="yes"]').onclick = () => {
+      close();
+      onYes();
+    };
+    backdrop.querySelector('[data-p="no"]').onclick = close;
+    document.body.appendChild(backdrop);
+    return close;
+  }
+
+  _promptDraw() {
+    this._prompt(`${this.controller.opponentName} offers a draw`, () => {
+      this.realtime.acceptDraw();
+      this.controller.endGame('draw-agreed', null);
+    });
+    // Also allow declining: the "Decline" button just closes (opponent keeps playing).
+    // Send an explicit decline when the modal is dismissed via the No button.
+    const noBtn = document.querySelector('.modal [data-p="no"]');
+    if (noBtn) noBtn.addEventListener('click', () => this.realtime.declineDraw());
+  }
+
+  _promptRematch() {
+    this._prompt(`${this.controller.opponentName} wants a rematch`, () => {
+      this.realtime.rematchAccept();
+    }, 'Play again', 'No thanks');
+  }
+
   // Transient "achievement unlocked" popup.
   _toast(achievement) {
     const el = document.createElement('div');
@@ -498,6 +642,8 @@ export class GameScreen {
 
   destroy() {
     this._autosave(); // preserve an unfinished game for resume
+    this._rtOff.forEach((off) => off());
+    this._rtOff = [];
     document.removeEventListener('keydown', this._keyHandler);
     window.removeEventListener('beforeunload', this._unloadHandler);
     this._removeModal();

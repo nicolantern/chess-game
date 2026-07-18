@@ -30,6 +30,9 @@ export const DEFAULT_PROFILE = {
     currentStreak: 0,
     bestStreak: 0,
     rating: 800, // Elo, updated after each game vs the AI
+    onlineWins: 0,
+    onlineLosses: 0,
+    onlineDraws: 0,
   },
   savedGames: [], // finished games the user chose to keep
   updatedAt: 0,
@@ -143,6 +146,10 @@ export function recordGame(profile, rec) {
     const score = rec.outcome === 'win' ? 1 : rec.outcome === 'draw' ? 0.5 : 0;
     const expected = 1 / (1 + 10 ** ((opp - s.rating) / 400));
     s.rating = Math.max(100, Math.round(s.rating + ELO_K * (score - expected)));
+  } else if (rec.mode === 'online') {
+    if (rec.outcome === 'win') s.onlineWins += 1;
+    else if (rec.outcome === 'loss') s.onlineLosses += 1;
+    else s.onlineDraws += 1;
   }
 
   profile.updatedAt = rec.endedAt || 0;

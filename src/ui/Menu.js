@@ -52,6 +52,7 @@ export class Menu {
         <div class="menu-grid">
           ${resumeBtn}
           <button class="${this.resumeAvailable ? '' : 'primary'}" data-act="ai">Play vs AI</button>
+          <button data-act="online">🌐 Play Online${this.account.loggedIn ? '' : ' <span class="hint">(log in)</span>'}</button>
           <button data-act="pvp">Local Multiplayer</button>
           <button data-act="stats">Profile &amp; Stats</button>
           <button data-act="settings">Settings</button>
@@ -67,6 +68,8 @@ export class Menu {
       this.root.querySelector('[data-act="account"]').onclick = () => this.onNavigate('account');
     }
     this.root.querySelector('[data-act="ai"]').onclick = () => this.renderAIConfig();
+    this.root.querySelector('[data-act="online"]').onclick = () =>
+      this.onNavigate(this.account.loggedIn ? 'online' : 'account');
     this.root.querySelector('[data-act="pvp"]').onclick = () => this.renderPvPConfig();
     this.root.querySelector('[data-act="stats"]').onclick = () => this.onNavigate('stats');
     this.root.querySelector('[data-act="settings"]').onclick = () => this.onNavigate('settings');
