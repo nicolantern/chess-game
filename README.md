@@ -77,11 +77,12 @@ adds a WebSocket layer (`/ws`) that authenticates with the same JWT, matchmakes
 by time control, and relays moves between the two players (each client runs the
 identical engine; server-side move validation is a planned hardening).
 
-**Deploying for real cross-device sync:** host `server/` somewhere (Render,
-Railway, Fly, a VPS…), set a strong `JWT_SECRET`, then build the frontend with
-`VITE_API_URL=https://your-server` and deploy the static `dist/`. Before
-production, also add HTTPS, restrict CORS to your frontend origin, and add rate
-limiting — the bundled dev server is intentionally minimal.
+**Deploying for real cross-device play:** the server also serves the built app,
+so the whole thing deploys as **one service**. See **[DEPLOY.md](DEPLOY.md)** for
+step-by-step Render instructions (a `render.yaml` blueprint is included). Note
+the free tier's storage is ephemeral (accounts reset on restart) — DEPLOY.md
+covers how to make it durable. Before production, also restrict CORS and add
+rate limiting; the bundled server is intentionally minimal.
 
 ## Architecture
 

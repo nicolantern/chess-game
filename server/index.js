@@ -15,6 +15,9 @@ import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getUser, createUser, setProfile } from './store.js';
 import { attachRealtime } from './realtime.js';
 
@@ -96,6 +99,19 @@ app.put('/api/profile', auth, (req, res) => {
   setProfile(req.username, profile);
   res.json({ ok: true });
 });
+
+// Serve the built frontend (single-service deployment) if it has been built.
+// The app, the API, and the WebSocket all share one origin in production.
+const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+if (existsSync(distDir)) {
+  app.use(express.static(distDir));
+  // SPA fallback for any non-API GET.
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(join(distDir, 'index.html'));
+  });
+  console.log('[chess-server] serving built frontend from /dist');
+}
 
 const server = app.listen(PORT, () => {
   console.log(`[chess-server] listening on http://localhost:${PORT}`);

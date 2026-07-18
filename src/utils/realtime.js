@@ -3,7 +3,10 @@
 // on :3001; in a deployed build set VITE_API_URL to the server origin.
 
 function wsUrl(token) {
-  const httpBase = import.meta.env.VITE_API_URL || `http://${location.hostname}:3001`;
+  // Default to the page's own origin: in production the server serves the app,
+  // and in dev Vite proxies /ws to the backend. Override with VITE_API_URL when
+  // the API is on a different origin.
+  const httpBase = import.meta.env.VITE_API_URL || location.origin;
   return `${httpBase.replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(token)}`;
 }
 

@@ -1,0 +1,15 @@
+# Render Blueprint — deploys the chess game as a single web service that serves
+# the built app, the REST API, and the WebSocket server on one origin.
+#
+# Usage: on https://render.com → New + → Blueprint → pick this repo → Apply.
+# Render sets PORT automatically and (with generateValue) a strong JWT secret.
+services:
+  - type: web
+    name: chess-game
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build && npm --prefix server install
+    startCommand: node server/index.js
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true

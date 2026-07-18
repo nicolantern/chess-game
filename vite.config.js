@@ -17,6 +17,12 @@ export default defineConfig({
         target: process.env.API_TARGET || 'http://localhost:3001',
         changeOrigin: true,
       },
+      // WebSocket proxy so the client can use the page origin for /ws in dev too.
+      '/ws': {
+        target: process.env.API_TARGET || 'http://localhost:3001',
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
 });
