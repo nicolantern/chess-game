@@ -8,7 +8,18 @@
 
 import { fileOf, rankOf, square } from '../engine/board.js';
 import { pieceColor, pieceType } from '../engine/pieces.js';
-import { pieceSvg } from '../assets/pieces.js';
+import { pieceSvg, PIECE_DEFS } from '../assets/pieces.js';
+
+// The pieces' shading gradients live in one shared <defs>, added to the page a
+// single time (referenced by every piece by ID). Boards created later reuse it.
+function ensurePieceDefs() {
+  if (typeof document === 'undefined' || document.getElementById('piece-defs')) return;
+  const holder = document.createElement('div');
+  holder.id = 'piece-defs';
+  holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+  holder.innerHTML = PIECE_DEFS;
+  document.body.appendChild(holder);
+}
 
 export class BoardView {
   /**
@@ -43,6 +54,7 @@ export class BoardView {
   }
 
   _build() {
+    ensurePieceDefs();
     this.wrap = document.createElement('div');
     this.wrap.className = 'board-wrap';
     this.board = document.createElement('div');

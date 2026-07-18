@@ -1,36 +1,92 @@
-// Inline SVG chess pieces (Staunton-style vector silhouettes) on a 45x45
-// viewBox. Each piece is drawn once as shared path markup; the color only
-// changes the fill and stroke, so the set is consistent and scales crisply from
-// ~28px on mobile to ~96px on desktop. Exported as PIECE_SVG[color][type].
+// Inline SVG chess pieces on a 45x45 viewBox. The geometry is the classic
+// detailed Staunton set by Colin M.L. Burnett ("Cburnett"), from Wikimedia
+// Commons (dual-licensed GPLv2+/GFDL/BSD) — the same pieces Wikipedia and lichess
+// use. Rendered here with a vertical body gradient for chess.com-style depth.
+//
+// Each shape uses two tokens the builder substitutes per color:
+//   __BODY__   -> the shading gradient (url(#pg-w) or url(#pg-b))
+//   __DETAIL__ -> the inner line/eye color (dark on white pieces, light on black)
+// so the internal detail reads on both colors. Exported as PIECE_SVG[color][type].
 
 import { WHITE, BLACK, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING } from '../engine/pieces.js';
 
-// Inner path markup per piece type. Coordinates share a common base near y≈40.
 const SHAPES = {
   [PAWN]:
-    '<path d="M22.5 10.5a4.2 4.2 0 0 0-2.6 7.5c-2 1.2-3.3 3.4-3.3 5.9 0 2.3 1.1 4.3 2.8 5.6-3.1 1.3-6.9 4.9-6.9 11h20c0-6.1-3.8-9.7-6.9-11 1.7-1.3 2.8-3.3 2.8-5.6 0-2.5-1.3-4.7-3.3-5.9a4.2 4.2 0 0 0-2.6-7.5z"/>',
+    '<path d="m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z" fill="__BODY__"/>',
   [ROOK]:
-    '<path d="M12 36h21v3H12zM13.5 33v-3h18v3zM14 30l1-11h15l1 11zM13 19v-6h4v2.5h3.5V13h4v2.5H31V13h4v6z"/>',
+    '<g transform="translate(0,0.3)" fill="__BODY__" fill-rule="evenodd">' +
+    '<path d="M 9,39 L 36,39 L 36,36 L 9,36 L 9,39 z" style="stroke-linecap:butt"/>' +
+    '<path d="M 12,36 L 12,32 L 33,32 L 33,36 L 12,36 z" style="stroke-linecap:butt"/>' +
+    '<path d="M 11,14 L 11,9 L 15,9 L 15,11 L 20,11 L 20,9 L 25,9 L 25,11 L 30,11 L 30,9 L 34,9 L 34,14" style="stroke-linecap:butt"/>' +
+    '<path d="M 34,14 L 31,17 L 14,17 L 11,14"/>' +
+    '<path d="M 31,17 L 31,29.5 L 14,29.5 L 14,17" style="stroke-linecap:butt;stroke-linejoin:miter"/>' +
+    '<path d="M 31,29.5 L 32.5,32 L 12.5,32 L 14,29.5"/>' +
+    '<path d="M 11,14 L 34,14" style="fill:none;stroke:__DETAIL__;stroke-linejoin:miter"/>' +
+    '</g>',
   [KNIGHT]:
-    '<path d="M14 39h18c0-3.5-1.2-13-1.6-16.5-.6-5-3.4-9.5-8.4-11.5l-1 2.5c-.4-.4-1.6-1.4-2.6-2l-1 3-3.4 1.9c-2.4 1.6-4 4-4.5 7l-.4 3.3 3.2 1.2 1.2-2 1.3.6-.8 2.2c-1.9 2.4-3 4.9-3.4 7.5z"/><circle cx="15.4" cy="22.2" r="1"/>',
+    '<g transform="translate(0,0.3)" fill-rule="evenodd">' +
+    '<path d="M 22,10 C 32.5,11 38.5,18 38,39 L 15,39 C 15,30 25,32.5 23,18" fill="__BODY__"/>' +
+    '<path d="M 24,18 C 24.38,20.91 18.45,25.37 16,27 C 13,29 13.18,31.34 11,31 C 9.958,30.06 12.41,27.96 11,28 C 10,28 11.19,29.23 10,30 C 9,30 5.997,31 6,26 C 6,24 12,14 12,14 C 12,14 13.89,12.1 14,10.5 C 13.27,9.506 13.5,8.5 13.5,7.5 C 14.5,6.5 16.5,10 16.5,10 L 18.5,10 C 18.5,10 19.28,8.008 21,7 C 22,7 22,10 22,10" fill="__BODY__"/>' +
+    '<path d="M 9.5 25.5 A 0.5 0.5 0 1 1 8.5,25.5 A 0.5 0.5 0 1 1 9.5 25.5 z" fill="__DETAIL__" stroke="__DETAIL__"/>' +
+    '<path d="M 15 15.5 A 0.5 1.5 0 1 1 14,15.5 A 0.5 1.5 0 1 1 15 15.5 z" transform="matrix(0.866,0.5,-0.5,0.866,9.693,-5.173)" fill="__DETAIL__" stroke="__DETAIL__"/>' +
+    '</g>',
   [BISHOP]:
-    '<path d="M22.5 9a2.4 2.4 0 0 0-1.6 4.2c-2.6 1.4-5.2 4.6-5.2 8.6 0 3.1 1.7 5.3 3.6 6.8-1.1.6-2.1 1.4-2.8 2.4h12c-.7-1-1.7-1.8-2.8-2.4 1.9-1.5 3.6-3.7 3.6-6.8 0-4-2.6-7.2-5.2-8.6A2.4 2.4 0 0 0 22.5 9z"/><path d="M13.5 33c2-1.6 5-2.2 9-2.2s7 .6 9 2.2c0 2-2 3.4-3 3.9H16.5c-1-.5-3-1.9-3-3.9z"/><path d="M20.5 20.5h4M22.5 18v5" stroke-width="1.2" fill="none"/>',
+    '<g transform="translate(0,0.6)" fill-rule="evenodd">' +
+    '<g fill="__BODY__" style="stroke-linecap:butt">' +
+    '<path d="M 9,36 C 12.39,35.03 19.11,36.43 22.5,34 C 25.89,36.43 32.61,35.03 36,36 C 36,36 37.65,36.54 39,38 C 38.32,38.97 37.35,38.99 36,38.5 C 32.61,37.53 25.89,38.96 22.5,37.5 C 19.11,38.96 12.39,37.53 9,38.5 C 7.65,38.99 6.68,38.97 6,38 C 7.35,36.54 9,36 9,36 z"/>' +
+    '<path d="M 15,32 C 17.5,34.5 27.5,34.5 30,32 C 30.5,30.5 30,30 30,30 C 30,27.5 27.5,26 27.5,26 C 33,24.5 33.5,14.5 22.5,10.5 C 11.5,14.5 12,24.5 17.5,26 C 17.5,26 15,27.5 15,30 C 15,30 14.5,30.5 15,32 z"/>' +
+    '<path d="M 25 8 A 2.5 2.5 0 1 1 20,8 A 2.5 2.5 0 1 1 25 8 z"/>' +
+    '</g>' +
+    '<path d="M 17.5,26 L 27.5,26 M 15,30 L 30,30 M 22.5,15.5 L 22.5,20.5 M 20,18 L 25,18" style="fill:none;stroke:__DETAIL__;stroke-linejoin:miter"/>' +
+    '</g>',
   [QUEEN]:
-    '<path d="M11 16a2 2 0 1 0-2-2 2 2 0 0 0 2 2zM34 16a2 2 0 1 0-2-2 2 2 0 0 0 2 2zM22.5 13a2 2 0 1 0-2-2 2 2 0 0 0 2 2zM17 16.5a1.7 1.7 0 1 0-1.7-1.7A1.7 1.7 0 0 0 17 16.5zM28 16.5a1.7 1.7 0 1 0-1.7-1.7A1.7 1.7 0 0 0 28 16.5z"/><path d="M11 16l3 14h17l3-14-5.5 5-3.5-9-3.5 9-5.5-5z"/><path d="M12.5 30c3-1.6 17-1.6 20 0l1.2 3.5c-3-1.6-19.4-1.6-22.4 0zM11.3 33.5c3-1.6 19.4-1.6 22.4 0V37H11.3z"/>',
+    '<g fill="__BODY__">' +
+    '<path d="M 9,26 C 17.5,24.5 30,24.5 36,26 L 38.5,13.5 L 31,25 L 30.7,10.9 L 25.5,24.5 L 22.5,10 L 19.5,24.5 L 14.3,10.9 L 14,25 L 6.5,13.5 L 9,26 z"/>' +
+    '<path d="M 9,26 C 9,28 10.5,28 11.5,30 C 12.5,31.5 12.5,31 12,33.5 C 10.5,34.5 11,36 11,36 C 9.5,37.5 11,38.5 11,38.5 C 17.5,39.5 27.5,39.5 34,38.5 C 34,38.5 35.5,37.5 34,36 C 34,36 34.5,34.5 33,33.5 C 32.5,31 32.5,31.5 33.5,30 C 34.5,28 36,28 36,26 C 27.5,24.5 17.5,24.5 9,26 z"/>' +
+    '<circle cx="6" cy="12" r="2"/><circle cx="14" cy="9" r="2"/><circle cx="22.5" cy="8" r="2"/><circle cx="31" cy="9" r="2"/><circle cx="39" cy="12" r="2"/>' +
+    '<path d="M 11.5,30 C 15,29 30,29 33.5,30" style="fill:none;stroke:__DETAIL__"/>' +
+    '<path d="M 12,33.5 C 18,32.5 27,32.5 33,33.5" style="fill:none;stroke:__DETAIL__"/>' +
+    '</g>',
   [KING]:
-    '<path d="M22.5 8v3M20.5 9.5h4" stroke-width="1.5" fill="none"/><path d="M22.5 12c-2.6 0-4.6 5-1 7.5-3-.5-9 1-9 6.5 0 3 3 5 5.5 4.2 2-.6 3.6-2.1 4.5-3.7.9 1.6 2.5 3.1 4.5 3.7 2.5.8 5.5-1.2 5.5-4.2 0-5.5-6-7-9-6.5 3.6-2.5 1.6-7.5-1-7.5z"/><path d="M12.5 30.5c3-1.7 17.5-1.7 20 0v3.5c-3-1.7-17-1.7-20 0zM12.5 34.5c3-1.7 17-1.7 20 0V38h-20z"/>',
+    '<g fill-rule="evenodd">' +
+    '<path d="M22.5 11.63V6M20 8h5" style="fill:none;stroke:__DETAIL__;stroke-linejoin:miter"/>' +
+    '<path d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" fill="__BODY__" style="stroke-linecap:butt;stroke-linejoin:miter"/>' +
+    '<path d="M12.5 37c5.5 3.5 14.5 3.5 20 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-2.5-7.5-12-10.5-16-4-3 6 6 10.5 6 10.5v7" fill="__BODY__"/>' +
+    '<path d="M12.5 30c5.5-3 14.5-3 20 0m-20 3.5c5.5-3 14.5-3 20 0m-20 3.5c5.5-3 14.5-3 20 0" style="fill:none;stroke:__DETAIL__"/>' +
+    '</g>',
 };
 
-// Build a full <svg> string for a piece in the given color.
+// Shared gradient definitions, injected into the page once (see PIECE_DEFS below).
+// Keeping them in a single <defs> — rather than inlining them into every piece
+// <svg> — avoids duplicate element IDs across the dozens of pieces on the board,
+// which would otherwise make every reference resolve to the first copy.
+//   pg-w / pg-b : vertical body shade (bright top → dark base) so each piece reads
+//                 as a rounded column with depth.
+export const PIECE_DEFS =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true">' +
+  '<defs>' +
+  '<linearGradient id="pg-w" gradientUnits="userSpaceOnUse" x1="22.5" y1="6" x2="22.5" y2="40">' +
+  '<stop offset="0" stop-color="#ffffff"/><stop offset="0.2" stop-color="#f7f1e3"/>' +
+  '<stop offset="0.62" stop-color="#eadfc8"/><stop offset="1" stop-color="#cdc0a2"/>' +
+  '</linearGradient>' +
+  '<linearGradient id="pg-b" gradientUnits="userSpaceOnUse" x1="22.5" y1="6" x2="22.5" y2="40">' +
+  '<stop offset="0" stop-color="#5f5b55"/><stop offset="0.2" stop-color="#48443e"/>' +
+  '<stop offset="0.62" stop-color="#302c27" /><stop offset="1" stop-color="#1a1814"/>' +
+  '</linearGradient>' +
+  '</defs></svg>';
+
+// Build a full <svg> string for a piece in the given color, substituting the
+// body-gradient and detail-color tokens into the shared Staunton geometry.
 function build(color, type) {
-  const fill = color === WHITE ? '#f5efe0' : '#33312e';
-  const stroke = color === WHITE ? '#2a2724' : '#100f0d';
-  const detail = color === WHITE ? '#2a2724' : '#d9d2c4';
+  const grad = color === WHITE ? 'pg-w' : 'pg-b';
+  const stroke = color === WHITE ? '#2a2724' : '#0b0a09';
+  const detail = color === WHITE ? '#2a2724' : '#f2ede2';
+  const inner = SHAPES[type].replaceAll('__BODY__', `url(#${grad})`).replaceAll('__DETAIL__', detail);
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45" class="piece-svg" ` +
     `aria-hidden="true">` +
-    `<g fill="${fill}" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" ` +
-    `stroke-linecap="round" style="--detail:${detail}">${SHAPES[type]}</g></svg>`
+    `<g fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round" ` +
+    `stroke-linejoin="round">${inner}</g></svg>`
   );
 }
 

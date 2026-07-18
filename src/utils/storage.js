@@ -8,7 +8,7 @@ export const DEFAULTS = {
   music: false, // optional background music
   highlights: true, // legal-move / last-move / check highlighting
   animations: true, // piece movement animations
-  theme: 'wood', // 'wood' | 'marble'
+  theme: 'green', // 'wood' | 'marble' | 'green' | 'blue' | 'coral' | 'slate' (chess.com-style green default)
 };
 
 /** Load settings, merged over defaults. */
