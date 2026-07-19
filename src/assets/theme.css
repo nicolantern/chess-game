@@ -1007,8 +1007,12 @@ label.num input {
 .nav-btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--home-text); }
 
 /* Center board */
-.home-center { display: flex; flex-direction: column; gap: 8px; }
-.home-board { width: 100%; aspect-ratio: 1 / 1; }
+.home-center { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.home-board { width: 100%; }
+/* The decorative board reuses BoardView, whose .board-wrap normally sizes itself
+   by viewport (min(92vw,78vh,640px)); constrain it to the home column so it can't
+   overflow and overlap the play panel. */
+.home-board .board-wrap { width: 100%; max-width: 100%; }
 .board-label { display: flex; align-items: center; gap: 8px; color: var(--home-text); font-weight: 600; }
 .board-label .avatar { width: 28px; height: 28px; border-radius: 6px; background: var(--home-panel-2); display: inline-flex; align-items: center; justify-content: center; }
 
