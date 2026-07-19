@@ -19,7 +19,9 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getUser, createUser, setProfile } from './store.js';
+import * as store from './store.js';
 import { attachRealtime } from './realtime.js';
+import { createSocialRouter } from './social.js';
 
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-insecure-secret-change-me';
@@ -32,6 +34,15 @@ if (JWT_SECRET === 'dev-insecure-secret-change-me') {
 const app = express();
 app.use(cors()); // dev: allow the Vite origin. Restrict in production.
 app.use(express.json({ limit: '256kb' }));
+
+// Late-bound realtime interface; populated once attachRealtime runs below (after
+// app.listen). The social router closes over this object and reads its fields at
+// request time, so the stub methods are replaced before any request arrives.
+const SOCIAL_REALTIME = {
+  isOnline: () => false,
+  pushTo: () => false,
+  launchGame: () => false,
+};
 
 const USERNAME_RE = /^[A-Za-z0-9_]{3,24}$/;
 
@@ -100,6 +111,10 @@ app.put('/api/profile', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Social layer (friends + challenges), behind bearer auth. Mounted before the
+// SPA catch-all so /api/social/* is not swallowed by the static fallback.
+app.use('/api/social', auth, createSocialRouter({ store, realtime: SOCIAL_REALTIME }));
+
 // Serve the built frontend (single-service deployment) if it has been built.
 // The app, the API, and the WebSocket all share one origin in production.
 const distDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
@@ -117,6 +132,20 @@ const server = app.listen(PORT, () => {
   console.log(`[chess-server] listening on http://localhost:${PORT}`);
 });
 
-// Attach the real-time (online multiplayer) WebSocket server on /ws.
-attachRealtime(server, JWT_SECRET);
+// Attach the real-time (online multiplayer) WebSocket server on /ws, and wire its
+// interface into the social router's late-bound holder.
+const realtime = attachRealtime(server, JWT_SECRET);
+Object.assign(SOCIAL_REALTIME, {
+  isOnline: realtime.isOnline,
+  pushTo: realtime.pushTo,
+  launchGame: (a, b, time) => realtime.launchGame(a, b, time),
+});
+
+// When a user connects/disconnects, tell their online friends so their panels
+// update the presence dot live.
+realtime.setPresenceHandler((username, online) => {
+  for (const friend of store.getFriends(username)) {
+    realtime.pushTo(friend, { type: 'presence', username, online });
+  }
+});
 
