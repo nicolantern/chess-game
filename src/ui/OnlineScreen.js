@@ -2,7 +2,7 @@
 // server to pair you. The 'matched' event is handled by the App (which swaps in
 // the game screen), so this screen only owns the pick + waiting states.
 
-import { TIME_PRESETS } from './Menu.js';
+import { TIME_PRESETS } from './timeControls.js';
 
 export class OnlineScreen {
   constructor(root, { realtime, onCancel }) {
