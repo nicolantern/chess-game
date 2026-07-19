@@ -7,6 +7,7 @@ import { DIFFICULTY_LABELS } from '../ai/difficulty.js';
 import { TIME_PRESETS, buildAiConfig, buildPvpConfig } from './timeControls.js';
 import { BoardView } from './BoardView.js';
 import { parseFen, START_FEN } from '../engine/fen.js';
+import { randomTagline } from './taglines.js';
 
 const presetKey = (m, i) => `${m}-${i}`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -30,7 +31,17 @@ export class HomeScreen {
   }
 
   destroy() {
+    clearInterval(this._splashTimer);
     this._board = null;
+  }
+
+  // Rotate the playful splash line every few seconds while the home is shown.
+  _startSplash() {
+    clearInterval(this._splashTimer);
+    this._splashTimer = setInterval(() => {
+      const el = this.root.querySelector('[data-splash]');
+      if (el) el.textContent = randomTagline();
+    }, 7000);
   }
 
   // --- Layout --------------------------------------------------------------
@@ -68,6 +79,7 @@ export class HomeScreen {
     return `
       <aside class="home-play">
         <h2 class="play-title">♟ Play Chess</h2>
+        <p class="splash" data-splash>${esc(randomTagline())}</p>
         <div class="play-cards">
           ${resume}
           <button class="play-card" data-act="online">
@@ -130,6 +142,8 @@ export class HomeScreen {
     this.root.querySelector('[data-act="friend"]').onclick = () => this.onPlayFriend();
     this.root.querySelector('[data-act="pvp"]').onclick = () => this.renderPvPConfig();
     this.root.querySelector('[data-act="history"]').onclick = () => this.onNavigate('stats');
+
+    this._startSplash();
   }
 
   // --- Time-control chooser (shared by both config panels) -----------------
