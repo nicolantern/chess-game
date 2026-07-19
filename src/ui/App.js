@@ -1,7 +1,7 @@
 // Top-level router. Mounts exactly one screen at a time into #app, owns the
 // shared settings object, and applies the board theme to <body>.
 
-import { Menu } from './Menu.js';
+import { HomeScreen } from './HomeScreen.js';
 import { GameScreen } from './GameScreen.js';
 import { Settings } from './Settings.js';
 import { HowToPlay } from './HowToPlay.js';
@@ -41,21 +41,32 @@ export class App {
 
   showMenu() {
     this._mount((screen) =>
-      new Menu(screen, {
+      new HomeScreen(screen, {
         onStart: (config) => this.showGame(config),
         onNavigate: (dest) => this._navigate(dest),
+        onPlayFriend: () => this._playFriend(),
         resumeAvailable: Boolean(loadInProgress()),
         onResume: () => this.showGame(null, loadInProgress()),
+        settings: this.settings,
         account: {
           loggedIn: isLoggedIn(),
           username: currentUser(),
           onLogout: () => {
             clearSession();
+            if (this.realtime) { this.realtime.close(); this.realtime = null; }
             this.showMenu();
           },
         },
       }),
     );
+  }
+
+  // "Play a Friend" — routes to online play until the friends feature ships,
+  // at which point this repoints to the friends/challenge flow.
+  _playFriend() {
+    if (!isLoggedIn()) { this.showAccount(); return; }
+    alert('Friend challenges are coming soon — playing online for now.');
+    this.showOnline();
   }
 
   _navigate(dest) {
