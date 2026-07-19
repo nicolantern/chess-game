@@ -1046,3 +1046,26 @@ label.num input {
   .nav-list { flex-direction: row; flex-wrap: wrap; }
   .nav-account { margin: 0 0 0 auto; flex-direction: row; padding-top: 0; }
 }
+
+/* ===== Online screen: matchmaking beside the Friends panel ===== */
+.online-wrap { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(300px, 380px); gap: 20px; align-items: start; max-width: 900px; margin: 0 auto; }
+@media (max-width: 760px) { .online-wrap { grid-template-columns: 1fr; } }
+
+/* Friends panel */
+.friends-host { margin-top: 4px; }
+.friends { text-align: left; }
+.friends h3 { margin: 0 0 10px; }
+.friends h4 { margin: 14px 0 6px; font-size: 0.85rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.04em; }
+.friend-add { display: flex; gap: 8px; }
+.friend-add input { flex: 1; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.2); color: inherit; }
+.friend-error { color: var(--danger); font-size: 0.9rem; margin: 6px 0 0; }
+.friend-list { list-style: none; padding: 0; margin: 4px 0; }
+.friend-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.friend-list .fname { flex: 1; }
+.friend-list .row-actions { display: flex; gap: 6px; margin-left: auto; align-items: center; }
+.friend-list .muted, .friends .muted { opacity: 0.6; font-size: 0.85rem; }
+.friend-list .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.friend-list .dot.on { background: var(--good); box-shadow: 0 0 6px var(--good); }
+.friend-list .dot.off { background: #6b6b6b; }
+.friends button.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.2); }
+.friends button[disabled] { opacity: 0.4; cursor: not-allowed; }

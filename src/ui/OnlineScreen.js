@@ -1,17 +1,34 @@
 // Online matchmaking: pick a time control, join the queue, and wait for the
 // server to pair you. The 'matched' event is handled by the App (which swaps in
-// the game screen), so this screen only owns the pick + waiting states.
+// the game screen), so this screen only owns the pick + waiting states. It also
+// hosts the Friends panel (add friends, respond to requests, challenge a friend).
 
 import { TIME_PRESETS } from './timeControls.js';
+import { FriendsPanel } from './FriendsPanel.js';
 
 export class OnlineScreen {
-  constructor(root, { realtime, onCancel }) {
+  constructor(root, { realtime, onCancel, snapshot, onRefresh, onChallenge }) {
     this.root = root;
     this.realtime = realtime;
     this.onCancel = onCancel;
     this.selected = { key: '3-0', time: { minutes: 3, increment: 0, delay: 0 } };
     this._offQueued = realtime.on('queued', () => this._renderWaiting());
+
+    // Two-part layout: matchmaking (re-renders) beside the persistent Friends panel.
+    this.root.innerHTML = '<div class="online-wrap"><div class="online-match" data-match></div><div class="friends-host" data-friends></div></div>';
+    this.matchHost = this.root.querySelector('[data-match]');
+    this.panel = new FriendsPanel(this.root.querySelector('[data-friends]'), {
+      snapshot,
+      onRefresh: onRefresh || (async () => {}),
+      onChallenge: onChallenge || (() => {}),
+    });
+
     this.renderPick();
+  }
+
+  // Called by App when a fresh social snapshot arrives (presence/push).
+  onSocial(snap) {
+    this.panel.update(snap);
   }
 
   renderPick() {
@@ -27,7 +44,7 @@ export class OnlineScreen {
       return `<div class="tc-cat"><span class="tc-label">${cat}</span><div class="option-row">${buttons}</div></div>`;
     }).join('');
 
-    this.root.innerHTML = `
+    this.matchHost.innerHTML = `
       <div class="panel">
         <h2>Play Online</h2>
         <p class="subtitle">You'll be matched with another player choosing the same time control.</p>
@@ -45,33 +62,33 @@ export class OnlineScreen {
         </div>
       </div>`;
 
-    this.root.querySelectorAll('[data-key]').forEach((btn) => {
+    this.matchHost.querySelectorAll('[data-key]').forEach((btn) => {
       btn.onclick = () => {
         const key = btn.dataset.key;
         this.selected =
           key === 'unlimited'
             ? { key, time: { minutes: null, increment: 0, delay: 0 } }
             : { key, time: { minutes: Number(btn.dataset.m), increment: Number(btn.dataset.i), delay: 0 } };
-        this.root.querySelectorAll('[data-key]').forEach((b) => b.classList.remove('selected'));
+        this.matchHost.querySelectorAll('[data-key]').forEach((b) => b.classList.remove('selected'));
         btn.classList.add('selected');
       };
     });
-    this.root.querySelector('[data-act="back"]').onclick = () => this.onCancel();
-    this.root.querySelector('[data-act="find"]').onclick = () => {
+    this.matchHost.querySelector('[data-act="back"]').onclick = () => this.onCancel();
+    this.matchHost.querySelector('[data-act="find"]').onclick = () => {
       this.realtime.queue(this.selected.time);
       this._renderWaiting();
     };
   }
 
   _renderWaiting() {
-    this.root.innerHTML = `
+    this.matchHost.innerHTML = `
       <div class="panel waiting">
         <h2>Finding an opponent…</h2>
         <div class="spinner"></div>
         <p class="subtitle">Waiting for another player. This stays open until someone joins.</p>
         <div class="actions"><button data-act="cancel">Cancel</button></div>
       </div>`;
-    this.root.querySelector('[data-act="cancel"]').onclick = () => {
+    this.matchHost.querySelector('[data-act="cancel"]').onclick = () => {
       this.realtime.cancel();
       this.onCancel();
     };
