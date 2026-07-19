@@ -971,3 +971,74 @@ label.num input {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ===== chess.com-style home shell ===== */
+.home {
+  --home-bg: #262421;
+  --home-panel: #302e2b;
+  --home-panel-2: #3d3a37;
+  --home-text: #e9e7e4;
+  --home-muted: #a8a29a;
+  --home-accent: #7fa650;
+  display: grid;
+  grid-template-columns: 220px minmax(320px, 1fr) minmax(300px, 380px);
+  gap: 18px;
+  align-items: start;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px;
+  color: var(--home-text);
+}
+
+/* Left nav */
+.home-nav { background: var(--home-panel); border-radius: 12px; padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; min-height: 60vh; }
+.home-nav .brand { font-size: 1.4rem; font-weight: 700; padding: 6px 8px 14px; }
+.home-nav .brand span { color: var(--home-accent); }
+.nav-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.nav-item { width: 100%; text-align: left; background: transparent; border: 0; color: var(--home-text); padding: 10px 10px; border-radius: 8px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; gap: 10px; }
+.nav-item .ni { width: 1.2em; text-align: center; }
+.nav-item:hover { background: var(--home-panel-2); }
+.nav-item.active { background: var(--home-panel-2); font-weight: 600; }
+.nav-account { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
+.nav-account .who { padding: 4px 8px; color: var(--home-muted); }
+.nav-btn { border: 0; border-radius: 8px; padding: 10px; cursor: pointer; font-size: 0.95rem; }
+.nav-btn.signup { background: var(--home-accent); color: #14240c; font-weight: 700; }
+.nav-btn.login { background: var(--home-panel-2); color: var(--home-text); }
+.nav-btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--home-text); }
+
+/* Center board */
+.home-center { display: flex; flex-direction: column; gap: 8px; }
+.home-board { width: 100%; aspect-ratio: 1 / 1; }
+.board-label { display: flex; align-items: center; gap: 8px; color: var(--home-text); font-weight: 600; }
+.board-label .avatar { width: 28px; height: 28px; border-radius: 6px; background: var(--home-panel-2); display: inline-flex; align-items: center; justify-content: center; }
+
+/* Right play panel */
+.home-play { background: var(--home-panel); border-radius: 12px; padding: 16px; }
+.play-title { margin: 0 0 14px; font-size: 1.5rem; }
+.play-cards { display: flex; flex-direction: column; gap: 10px; }
+.play-card { display: flex; align-items: center; gap: 14px; text-align: left; width: 100%; background: var(--home-panel-2); border: 0; border-radius: 10px; padding: 14px; cursor: pointer; color: var(--home-text); transition: transform .05s, background .15s; }
+.play-card:hover { background: #47433f; transform: translateY(-1px); }
+.play-card .pc-icon { font-size: 1.7rem; width: 40px; text-align: center; }
+.play-card .pc-text { display: flex; flex-direction: column; }
+.play-card .pc-text strong { font-size: 1.1rem; }
+.play-card .pc-text small { color: var(--home-muted); }
+.play-card.resume { background: var(--home-accent); color: #14240c; }
+.play-card.resume .pc-text small { color: rgba(0,0,0,0.6); }
+.play-card .hint { font-size: 0.75rem; color: var(--home-muted); font-weight: 400; }
+.play-foot { margin-top: 12px; width: 100%; background: transparent; border: 0; color: var(--home-muted); padding: 10px; cursor: pointer; border-top: 1px solid rgba(255,255,255,0.08); }
+
+/* Home config sub-panels reuse the existing .panel styles but sit on the dark bg */
+.home-panel { max-width: 560px; margin: 24px auto; }
+
+/* Responsive: cards drop under the board, then nav becomes a top bar */
+@media (max-width: 980px) {
+  .home { grid-template-columns: 200px 1fr; }
+  .home-play { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .home { grid-template-columns: 1fr; padding: 10px; }
+  .home-nav { min-height: 0; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .home-nav .brand { padding: 6px 8px; }
+  .nav-list { flex-direction: row; flex-wrap: wrap; }
+  .nav-account { margin: 0 0 0 auto; flex-direction: row; padding-top: 0; }
+}
