@@ -97,9 +97,9 @@ export class HomeScreen {
       <div class="home">
         ${this._sidebar()}
         <main class="home-center">
-          <div class="board-label top"><span class="avatar">🙂</span> Opponent</div>
+          <div class="board-label top">Opponent</div>
           <div class="home-board" data-board></div>
-          <div class="board-label bottom"><span class="avatar">🙂</span> ${bottomName}</div>
+          <div class="board-label bottom">${bottomName}</div>
         </main>
         ${this._cards()}
       </div>`;

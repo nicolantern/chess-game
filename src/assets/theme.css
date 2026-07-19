@@ -973,6 +973,9 @@ label.num input {
 }
 
 /* ===== chess.com-style home shell ===== */
+/* The home fills the whole viewport: drop the .screen padding/centering for it. */
+.screen:has(.home) { padding: 0; }
+
 .home {
   --home-bg: #262421;
   --home-panel: #302e2b;
@@ -983,15 +986,16 @@ label.num input {
   display: grid;
   grid-template-columns: 220px minmax(320px, 1fr) minmax(300px, 380px);
   gap: 18px;
-  align-items: start;
-  max-width: 1200px;
-  margin: 0 auto;
+  align-items: stretch;
+  align-self: stretch;
+  width: 100%;
+  min-height: 100vh;
   padding: 18px;
   color: var(--home-text);
 }
 
 /* Left nav */
-.home-nav { background: var(--home-panel); border-radius: 12px; padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; min-height: 60vh; }
+.home-nav { background: var(--home-panel); border-radius: 12px; padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; }
 .home-nav .brand { font-size: 1.4rem; font-weight: 700; padding: 6px 8px 14px; }
 .home-nav .brand span { color: var(--home-accent); }
 .nav-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -1006,13 +1010,14 @@ label.num input {
 .nav-btn.login { background: var(--home-panel-2); color: var(--home-text); }
 .nav-btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--home-text); }
 
-/* Center board */
-.home-center { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.home-board { width: 100%; }
+/* Center board — vertically centered and capped to the viewport height so the
+   whole shell fits on screen without scrolling. */
+.home-center { display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 0; min-height: 0; }
+.home-board { width: 100%; display: flex; justify-content: center; align-items: center; min-height: 0; }
 /* The decorative board reuses BoardView, whose .board-wrap normally sizes itself
-   by viewport (min(92vw,78vh,640px)); constrain it to the home column so it can't
-   overflow and overlap the play panel. */
-.home-board .board-wrap { width: 100%; max-width: 100%; }
+   by viewport; cap it to the smaller of its column width and the viewport height
+   so it can't overflow the play panel or run off-screen. */
+.home-board .board-wrap { width: min(100%, calc(100vh - 150px)); max-width: 100%; }
 .board-label { display: flex; align-items: center; gap: 8px; color: var(--home-text); font-weight: 600; }
 .board-label .avatar { width: 28px; height: 28px; border-radius: 6px; background: var(--home-panel-2); display: inline-flex; align-items: center; justify-content: center; }
 
@@ -1040,11 +1045,12 @@ label.num input {
   .home-play { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
-  .home { grid-template-columns: 1fr; padding: 10px; }
-  .home-nav { min-height: 0; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .home { grid-template-columns: 1fr; padding: 10px; min-height: 0; }
+  .home-nav { flex-direction: row; flex-wrap: wrap; align-items: center; }
   .home-nav .brand { padding: 6px 8px; }
   .nav-list { flex-direction: row; flex-wrap: wrap; }
   .nav-account { margin: 0 0 0 auto; flex-direction: row; padding-top: 0; }
+  .home-board .board-wrap { width: 100%; } /* full column width when stacked */
 }
 
 /* ===== Online screen: matchmaking beside the Friends panel ===== */
