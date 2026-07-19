@@ -8,11 +8,54 @@ import { WebSocketServer } from 'ws';
 import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 
+// Tracks which usernames have at least one live socket, and pushes messages to
+// all of a user's sockets. Case-insensitive by username. Pure/testable.
+export function createPresence() {
+  const byUser = new Map(); // lowercased username -> Set<socket>
+  const key = (u) => u.toLowerCase();
+  return {
+    add(username, ws) {
+      const k = key(username);
+      if (!byUser.has(k)) byUser.set(k, new Set());
+      byUser.get(k).add(ws);
+    },
+    remove(username, ws) {
+      const set = byUser.get(key(username));
+      if (!set) return;
+      set.delete(ws);
+      if (set.size === 0) byUser.delete(key(username));
+    },
+    isOnline(username) {
+      return byUser.has(key(username));
+    },
+    pushTo(username, obj) {
+      const set = byUser.get(key(username));
+      if (!set || set.size === 0) return false;
+      const data = JSON.stringify(obj);
+      for (const ws of set) if (ws.readyState === 1) ws.send(data);
+      return true;
+    },
+    socketFor(username) {
+      const set = byUser.get(key(username));
+      if (!set) return null;
+      for (const ws of set) if (ws.readyState === 1) return ws;
+      return null;
+    },
+    users() {
+      return [...byUser.keys()];
+    },
+  };
+}
+
 export function attachRealtime(server, jwtSecret) {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
   const queues = new Map(); // time-control key -> a single waiting socket
   const rooms = new Map(); // roomId -> { players: [wsA, wsB], time }
+
+  const presence = createPresence();
+  // Notify a user's friends when their online state changes. Injected by index.js.
+  let onPresenceChange = () => {};
 
   const send = (ws, obj) => {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
@@ -32,6 +75,8 @@ export function attachRealtime(server, jwtSecret) {
     ws.username = username;
     ws.roomId = null;
     ws.queueKey = null;
+    presence.add(username, ws);
+    onPresenceChange(username, true);
 
     ws.on('message', (data) => {
       let msg;
@@ -42,7 +87,11 @@ export function attachRealtime(server, jwtSecret) {
       }
       handle(ws, msg);
     });
-    ws.on('close', () => cleanup(ws));
+    ws.on('close', () => {
+      cleanup(ws);
+      presence.remove(username, ws);
+      if (!presence.isOnline(username)) onPresenceChange(username, false);
+    });
   });
 
   function handle(ws, msg) {
@@ -152,5 +201,21 @@ export function attachRealtime(server, jwtSecret) {
     }
   }
 
-  return wss;
+  // Pair two usernames' live sockets into a room (used by friend challenges).
+  function launchGame(from, to, time) {
+    const a = presence.socketFor(from);
+    const b = presence.socketFor(to);
+    if (!a || !b) return false;
+    createRoom(a, b, time);
+    return true;
+  }
+
+  return {
+    wss,
+    presence,
+    isOnline: (u) => presence.isOnline(u),
+    pushTo: (u, obj) => presence.pushTo(u, obj),
+    setPresenceHandler: (fn) => { onPresenceChange = fn; },
+    launchGame,
+  };
 }
