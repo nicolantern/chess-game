@@ -44,4 +44,15 @@ export const api = {
   login: (username, password) => request('/api/login', { method: 'POST', body: { username, password } }),
   getProfile: () => request('/api/profile', { auth: true }),
   putProfile: (profile) => request('/api/profile', { method: 'PUT', auth: true, body: { profile } }),
+  social: {
+    get: () => request('/api/social', { auth: true }),
+    request: (username) => request('/api/social/requests', { method: 'POST', auth: true, body: { username } }),
+    accept: (username) => request('/api/social/requests/accept', { method: 'POST', auth: true, body: { username } }),
+    decline: (username) => request('/api/social/requests/decline', { method: 'POST', auth: true, body: { username } }),
+    unfriend: (username) => request(`/api/social/friends/${encodeURIComponent(username)}`, { method: 'DELETE', auth: true }),
+    challenge: (username, time) => request('/api/social/challenges', { method: 'POST', auth: true, body: { username, time } }),
+    acceptChallenge: (id) => request(`/api/social/challenges/${encodeURIComponent(id)}/accept`, { method: 'POST', auth: true }),
+    counterChallenge: (id, time) => request(`/api/social/challenges/${encodeURIComponent(id)}/counter`, { method: 'POST', auth: true, body: { time } }),
+    declineChallenge: (id) => request(`/api/social/challenges/${encodeURIComponent(id)}/decline`, { method: 'POST', auth: true }),
+  },
 };
