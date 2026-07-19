@@ -115,3 +115,62 @@ export function listRequests(username) {
     .map((r) => ({ to: r.to, at: r.at }));
   return { incoming, outgoing };
 }
+
+// --- Challenges ------------------------------------------------------------
+let challengeSeq = 0;
+const ACTIVE = new Set(['pending', 'countered', 'accepted']);
+
+export function createChallenge(from, to, time) {
+  const uf = getUser(from);
+  const ut = getUser(to);
+  const id = `c${Date.now().toString(36)}_${(challengeSeq++).toString(36)}`;
+  const c = {
+    id,
+    from: uf?.username || from,
+    to: ut?.username || to,
+    time: time || null,
+    proposedBy: uf?.username || from,
+    state: 'pending',
+    at: Date.now(),
+  };
+  db.challenges[id] = c;
+  persist();
+  return c;
+}
+
+export function getChallenge(id) {
+  return db.challenges[id] || null;
+}
+
+export function updateChallenge(id, patch) {
+  const c = db.challenges[id];
+  if (!c) return null;
+  Object.assign(c, patch);
+  persist();
+  return c;
+}
+
+export function removeChallenge(id) {
+  if (db.challenges[id]) {
+    delete db.challenges[id];
+    persist();
+  }
+}
+
+export function listChallenges(username) {
+  const all = Object.values(db.challenges).filter((c) => ACTIVE.has(c.state));
+  return {
+    incoming: all.filter((c) => sameName(c.to, username)),
+    outgoing: all.filter((c) => sameName(c.from, username)),
+  };
+}
+
+export function activeChallengeBetween(a, b) {
+  return (
+    Object.values(db.challenges).find(
+      (c) =>
+        ACTIVE.has(c.state) &&
+        ((sameName(c.from, a) && sameName(c.to, b)) || (sameName(c.from, b) && sameName(c.to, a))),
+    ) || null
+  );
+}
