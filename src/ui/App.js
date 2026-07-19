@@ -8,7 +8,9 @@ import { HowToPlay } from './HowToPlay.js';
 import { StatsScreen } from './StatsScreen.js';
 import { AccountScreen } from './AccountScreen.js';
 import { OnlineScreen } from './OnlineScreen.js';
-import { loadSettings } from '../utils/storage.js';
+import { loadSettings, saveSettings } from '../utils/storage.js';
+import { initLanguage, setLanguage } from '../utils/i18n.js';
+import { LanguageModal } from './LanguageModal.js';
 import { loadInProgress } from '../utils/persistence.js';
 import { isLoggedIn, currentUser, clearSession, getToken } from '../utils/session.js';
 import { initSync, pullProfile } from '../utils/sync.js';
@@ -21,6 +23,7 @@ export class App {
   constructor(root) {
     this.root = root;
     this.settings = loadSettings();
+    initLanguage(this.settings.language);
     this.current = null;
     this._social = emptySocial();
     this._promptedLaunch = new Set(); // challenge ids we've already offered "start now"
@@ -126,6 +129,7 @@ export class App {
         onStart: (config) => this.showGame(config),
         onNavigate: (dest) => this._navigate(dest),
         onPlayFriend: () => this._playFriend(),
+        onLanguage: () => this._showLanguage(),
         resumeAvailable: Boolean(loadInProgress()),
         onResume: () => this.showGame(null, loadInProgress()),
         settings: this.settings,
@@ -148,6 +152,18 @@ export class App {
   _playFriend() {
     if (!isLoggedIn()) { this.showAccount(); return; }
     this.showOnline();
+  }
+
+  // Open the language picker; re-render the home in the chosen language.
+  _showLanguage() {
+    new LanguageModal({
+      onChoose: (code) => {
+        setLanguage(code);
+        this.settings.language = code;
+        saveSettings(this.settings);
+        this.showMenu();
+      },
+    });
   }
 
   _navigate(dest) {

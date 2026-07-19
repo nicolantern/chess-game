@@ -9,6 +9,7 @@ export const DEFAULTS = {
   highlights: true, // legal-move / last-move / check highlighting
   animations: true, // piece movement animations
   theme: 'green', // 'wood' | 'marble' | 'green' | 'blue' | 'coral' | 'slate' (chess.com-style green default)
+  language: 'en', // UI language code (see src/utils/i18n.js)
 };
 
 /** Load settings, merged over defaults. */

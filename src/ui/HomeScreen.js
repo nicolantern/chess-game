@@ -8,6 +8,7 @@ import { TIME_PRESETS, buildAiConfig, buildPvpConfig } from './timeControls.js';
 import { BoardView } from './BoardView.js';
 import { parseFen, START_FEN } from '../engine/fen.js';
 import { randomTagline } from './taglines.js';
+import { t, currentLanguageLabel } from '../utils/i18n.js';
 
 const presetKey = (m, i) => `${m}-${i}`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -17,11 +18,12 @@ export class HomeScreen {
    * @param {HTMLElement} root
    * @param {object} opts  onStart, onNavigate, onPlayFriend, resumeAvailable, onResume, account, settings
    */
-  constructor(root, { onStart, onNavigate, onPlayFriend, resumeAvailable = false, onResume, account, settings }) {
+  constructor(root, { onStart, onNavigate, onPlayFriend, onLanguage, resumeAvailable = false, onResume, account, settings }) {
     this.root = root;
     this.onStart = onStart;
     this.onNavigate = onNavigate;
     this.onPlayFriend = onPlayFriend || (() => {});
+    this.onLanguage = onLanguage || (() => {});
     this.resumeAvailable = resumeAvailable;
     this.onResume = onResume || (() => {});
     this.account = account || { loggedIn: false, username: null, onLogout: () => {} };
@@ -49,21 +51,22 @@ export class HomeScreen {
     const acct = this.account.loggedIn
       ? `<div class="nav-account">
            <span class="who">👤 ${esc(this.account.username)}</span>
-           <button data-act="logout" class="nav-btn ghost">Log out</button>
+           <button data-act="logout" class="nav-btn ghost">${esc(t('account.logout'))}</button>
          </div>`
       : `<div class="nav-account">
-           <button data-act="account" class="nav-btn login">Log In</button>
-           <button data-act="signup" class="nav-btn signup">Sign Up</button>
+           <button data-act="account" class="nav-btn login">${esc(t('account.login'))}</button>
+           <button data-act="signup" class="nav-btn signup">${esc(t('account.signup'))}</button>
          </div>`;
     return `
       <nav class="home-nav">
         <div class="brand">♞ <span>Chess</span></div>
         <ul class="nav-list">
-          <li><button class="nav-item active" data-nav="play"><span class="ni">♟</span> Play</button></li>
-          <li><button class="nav-item" data-nav="howto"><span class="ni">🎓</span> Learn</button></li>
-          <li><button class="nav-item" data-nav="stats"><span class="ni">📊</span> Stats</button></li>
-          <li><button class="nav-item" data-nav="settings"><span class="ni">⚙️</span> Settings</button></li>
+          <li><button class="nav-item active" data-nav="play"><span class="ni">♟</span> ${esc(t('nav.play'))}</button></li>
+          <li><button class="nav-item" data-nav="howto"><span class="ni">🎓</span> ${esc(t('nav.learn'))}</button></li>
+          <li><button class="nav-item" data-nav="stats"><span class="ni">📊</span> ${esc(t('nav.stats'))}</button></li>
+          <li><button class="nav-item" data-nav="settings"><span class="ni">⚙️</span> ${esc(t('nav.settings'))}</button></li>
         </ul>
+        <button class="nav-lang" data-act="language">🌐 ${esc(currentLanguageLabel())}</button>
         ${acct}
       </nav>`;
   }
@@ -72,44 +75,44 @@ export class HomeScreen {
     const resume = this.resumeAvailable
       ? `<button class="play-card resume" data-act="resume">
            <span class="pc-icon">▶</span>
-           <span class="pc-text"><strong>Resume Game</strong><small>Pick up where you left off</small></span>
+           <span class="pc-text"><strong>${esc(t('card.resume.title'))}</strong><small>${esc(t('card.resume.sub'))}</small></span>
          </button>`
       : '';
-    const onlineHint = this.account.loggedIn ? '' : ' <span class="hint">(log in)</span>';
+    const onlineHint = this.account.loggedIn ? '' : ` <span class="hint">${esc(t('card.online.hint'))}</span>`;
     return `
       <aside class="home-play">
-        <h2 class="play-title">♟ Play Chess</h2>
+        <h2 class="play-title">♟ ${esc(t('play.title'))}</h2>
         <p class="splash" data-splash>${esc(randomTagline())}</p>
         <div class="play-cards">
           ${resume}
           <button class="play-card" data-act="online">
             <span class="pc-icon">⚡</span>
-            <span class="pc-text"><strong>Play Online${onlineHint}</strong><small>Play vs a person</small></span>
+            <span class="pc-text"><strong>${esc(t('card.online.title'))}${onlineHint}</strong><small>${esc(t('card.online.sub'))}</small></span>
           </button>
           <button class="play-card" data-act="ai">
             <span class="pc-icon">🤖</span>
-            <span class="pc-text"><strong>Play Bots</strong><small>Challenge the computer</small></span>
+            <span class="pc-text"><strong>${esc(t('card.bots.title'))}</strong><small>${esc(t('card.bots.sub'))}</small></span>
           </button>
           <button class="play-card" data-act="friend">
             <span class="pc-icon">🤝</span>
-            <span class="pc-text"><strong>Play a Friend</strong><small>Invite a friend to a game</small></span>
+            <span class="pc-text"><strong>${esc(t('card.friend.title'))}</strong><small>${esc(t('card.friend.sub'))}</small></span>
           </button>
           <button class="play-card" data-act="pvp">
             <span class="pc-icon">👥</span>
-            <span class="pc-text"><strong>Pass &amp; Play</strong><small>Two players, one device</small></span>
+            <span class="pc-text"><strong>${esc(t('card.pvp.title'))}</strong><small>${esc(t('card.pvp.sub'))}</small></span>
           </button>
         </div>
-        <button class="play-foot" data-act="history">🏁 Game History</button>
+        <button class="play-foot" data-act="history">🏁 ${esc(t('home.gameHistory'))}</button>
       </aside>`;
   }
 
   renderHome() {
-    const bottomName = this.account.loggedIn ? esc(this.account.username) : 'Player';
+    const bottomName = this.account.loggedIn ? esc(this.account.username) : esc(t('home.player'));
     this.root.innerHTML = `
       <div class="home">
         ${this._sidebar()}
         <main class="home-center">
-          <div class="board-label top">Opponent</div>
+          <div class="board-label top">${esc(t('home.opponent'))}</div>
           <div class="home-board" data-board></div>
           <div class="board-label bottom">${bottomName}</div>
         </main>
@@ -127,6 +130,7 @@ export class HomeScreen {
     this.root.querySelector('[data-nav="howto"]').onclick = () => this.onNavigate('howto');
     this.root.querySelector('[data-nav="stats"]').onclick = () => this.onNavigate('stats');
     this.root.querySelector('[data-nav="settings"]').onclick = () => this.onNavigate('settings');
+    this.root.querySelector('[data-act="language"]').onclick = () => this.onLanguage();
     const logout = this.root.querySelector('[data-act="logout"]');
     if (logout) logout.onclick = () => this.account.onLogout();
     const acct = this.root.querySelector('[data-act="account"]');
