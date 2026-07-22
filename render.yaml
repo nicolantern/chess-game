@@ -13,3 +13,8 @@ services:
     envVars:
       - key: JWT_SECRET
         generateValue: true
+      # Paste your free Neon/Supabase connection string here in the Render
+      # dashboard so accounts persist across restarts. Leave unset to fall back
+      # to the (ephemeral) JSON file.
+      - key: DATABASE_URL
+        sync: false

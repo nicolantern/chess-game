@@ -29,20 +29,51 @@ You'll do this part — it needs your own Render + GitHub accounts.
 
 Deploy, then open the service URL.
 
+## Keeping it "always on" — for free
+
+Render's free tier has two gaps for a 24/7 server. Both are covered for free by
+the setup below; you don't have to pay for the $7 plan unless you want to skip
+these two steps.
+
+### 1. Stop it sleeping — free keep-alive ping
+
+Free services sleep after ~15 min idle; the first request then takes ~30–50s to
+wake. Keep it awake with a free external cron that pings the health endpoint:
+
+1. Go to <https://cron-job.org> and sign up (free).
+2. **Create cronjob** → URL `https://<your-app>.onrender.com/api/health`.
+3. Schedule: **every 10 minutes**. Save.
+
+That's it — the ping keeps the service warm, so players never hit a cold start.
+
+### 2. Keep accounts from vanishing — free Neon database
+
+By default accounts live in `server/data.json`, and the free tier's disk is
+**ephemeral** — it resets on every restart or redeploy, wiping all logins. The
+server now supports a **Postgres backend** (a free Neon database) that survives
+restarts. Set it up once:
+
+1. Go to <https://neon.tech> and sign up (free).
+2. Create a project → copy its **connection string** (looks like
+   `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`).
+3. In Render → your service → **Environment** → add:
+   `DATABASE_URL` = the connection string you copied.
+4. **Save** (Render redeploys). On boot you'll see
+   `[store] using Postgres backend (durable accounts)` in the logs.
+
+The server creates its own table on first boot — no SQL to run. If `DATABASE_URL`
+is unset it falls back to the JSON file automatically, so local dev needs nothing.
+
 ## Good to know
 
 - **WebSockets** work on Render's free tier — online play works out of the box,
   same origin, over `wss://` (HTTPS is automatic).
-- **Cold starts:** free services sleep after ~15 min idle; the first request
-  then takes ~30–50s to wake. Fine for casual play.
-- **Storage is ephemeral on the free tier.** Accounts live in `server/data.json`,
-  which resets whenever the service restarts or redeploys. So logins are *not*
-  durable on free Render. To make accounts persist you can either:
-  - use a host with a **persistent volume** (Railway, Fly.io), pointing
-    `DATA_FILE` at the mounted path, or
-  - swap the JSON store (`server/store.js`) for a real database (Postgres via
-    Neon/Supabase, or Redis via Upstash — all have free tiers).
-  Ask and I can wire one of these in.
+- **The $7 Render Starter plan** is optional: it never sleeps and includes a
+  persistent disk, so it replaces *both* free steps above in one box. Take it
+  only if you'd rather not wire up the cron + Neon yourself.
+- **Alternative to Neon:** any Postgres works — Supabase also has a free tier.
+  Or use a host with a **persistent volume** (Railway, Fly.io) and point
+  `DATA_FILE` at the mounted path to keep the JSON file instead.
 
 ## Alternatives
 

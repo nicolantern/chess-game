@@ -128,9 +128,21 @@ if (existsSync(distDir)) {
   console.log('[chess-server] serving built frontend from /dist');
 }
 
+// Load the store (async in Postgres mode) before we start serving requests.
+await store.initStore();
+
 const server = app.listen(PORT, () => {
   console.log(`[chess-server] listening on http://localhost:${PORT}`);
 });
+
+// On shutdown (Render sends SIGTERM on redeploy/scale), flush any pending
+// Postgres write so the last change isn't lost, then exit.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, async () => {
+    try { await store.flush(); } catch { /* ignore */ }
+    process.exit(0);
+  });
+}
 
 // Attach the real-time (online multiplayer) WebSocket server on /ws, and wire its
 // interface into the social router's late-bound holder.

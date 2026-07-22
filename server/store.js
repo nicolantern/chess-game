@@ -1,7 +1,16 @@
-// Tiny persistent store. Keeps all users and their profiles in a single JSON
-// file so the backend has zero native/database dependencies and runs anywhere
-// Node does. Fine for a personal-scale account service; swap for a real DB
-// (Postgres, etc.) before high-scale production use.
+// Tiny persistent store. Keeps all users and their profiles as a single JSON
+// document. Two interchangeable backends, chosen at boot:
+//
+//   • File (default) — one JSON file on disk. Zero dependencies; used locally
+//     and in tests. Perfect until the host's disk is ephemeral.
+//   • Postgres (opt-in via DATABASE_URL) — the same JSON document lives in one
+//     row of a `kv` table, so accounts survive restarts/redeploys on free hosts
+//     (Render, etc.) whose disks reset. Point DATABASE_URL at a free Neon/Supabase
+//     database and it just works.
+//
+// The whole in-memory `db` and every accessor below are identical for both
+// backends — only load/save differ. Postgres writes are async and coalesced
+// (write-behind), so the accessors stay synchronous exactly as before.
 
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -9,30 +18,94 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FILE = process.env.DATA_FILE || join(here, 'data.json');
+const PG_URL = process.env.DATABASE_URL || null;
 
 let db = { users: {}, friendRequests: [], challenges: {} }; // key(username) -> user; requests[]; challenges by id
 
-function load() {
+// Backfill any missing top-level shape after a load from either backend.
+function normalize() {
+  if (!db || typeof db !== 'object') db = {};
+  if (!db.users) db.users = {};
+  if (!Array.isArray(db.friendRequests)) db.friendRequests = [];
+  if (!db.challenges || typeof db.challenges !== 'object') db.challenges = {};
+}
+
+// ---- File backend --------------------------------------------------------
+function loadFile() {
   if (existsSync(FILE)) {
     try {
       db = JSON.parse(readFileSync(FILE, 'utf8'));
-      if (!db.users) db.users = {};
-      if (!Array.isArray(db.friendRequests)) db.friendRequests = [];
-      if (!db.challenges || typeof db.challenges !== 'object') db.challenges = {};
     } catch {
-      db = { users: {}, friendRequests: [], challenges: {} };
+      db = {};
     }
+    normalize();
   }
 }
 
 // Write atomically: dump to a temp file then rename over the real one.
-function persist() {
+function persistFile() {
   const tmp = `${FILE}.tmp`;
   writeFileSync(tmp, JSON.stringify(db, null, 2));
   renameSync(tmp, FILE);
 }
 
-load();
+// ---- Postgres backend (write-behind) -------------------------------------
+// A mutation flips `dirty` and kicks a single pump loop that upserts the latest
+// snapshot. Rapid mutations coalesce into one write; there is no await between
+// the loop's `dirty` check and clearing `pumping`, so no wakeup can be lost.
+let pool = null;
+let dirty = false;
+let pumping = null;
+
+async function pump() {
+  try {
+    while (dirty) {
+      dirty = false;
+      const snapshot = JSON.stringify(db);
+      await pool.query(
+        'INSERT INTO kv (id, data) VALUES ($1, $2::jsonb) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data',
+        ['db', snapshot],
+      );
+    }
+  } catch (e) {
+    console.error('[store] postgres write failed:', e.message);
+  } finally {
+    pumping = null;
+  }
+}
+
+function persistPg() {
+  dirty = true;
+  if (!pumping) pumping = pump();
+}
+
+function persist() {
+  if (PG_URL) persistPg();
+  else persistFile();
+}
+
+// File mode loads synchronously at import so existing callers and tests see
+// data immediately. Postgres mode loads asynchronously in initStore() (awaited
+// by the server at boot, before any request is served).
+if (!PG_URL) loadFile();
+
+/** Async boot hook. No-op in file mode; connects + loads in Postgres mode. */
+export async function initStore() {
+  if (!PG_URL) return;
+  const { default: pg } = await import('pg');
+  // Neon/Supabase require SSL; skip cert verification for portability across hosts.
+  pool = new pg.Pool({ connectionString: PG_URL, ssl: { rejectUnauthorized: false } });
+  await pool.query('CREATE TABLE IF NOT EXISTS kv (id text PRIMARY KEY, data jsonb NOT NULL)');
+  const { rows } = await pool.query('SELECT data FROM kv WHERE id = $1', ['db']);
+  if (rows[0]) db = rows[0].data;
+  normalize();
+  console.log('[store] using Postgres backend (durable accounts)');
+}
+
+/** Wait for any pending Postgres write to land. Call on graceful shutdown. */
+export async function flush() {
+  if (pumping) await pumping;
+}
 
 const key = (username) => username.toLowerCase();
 
