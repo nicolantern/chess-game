@@ -1,15 +1,19 @@
 // Settings screen. Edits the shared settings object in place, persists every
 // change, and calls onChange so the rest of the app can react live (theme swap,
-// sound toggle, etc.).
+// sound toggle, etc.). Also hosts the Language picker.
 
 import { saveSettings } from '../utils/storage.js';
+import { t, setLanguage, currentLanguageLabel } from '../utils/i18n.js';
+import { LanguageModal } from './LanguageModal.js';
 
 const TOGGLES = [
-  ['sound', 'Sound effects'],
-  ['music', 'Background music'],
-  ['highlights', 'Move highlights'],
-  ['animations', 'Animations'],
+  ['sound', 'settings.sound'],
+  ['music', 'settings.music'],
+  ['highlights', 'settings.highlights'],
+  ['animations', 'settings.animations'],
 ];
+
+const THEMES = ['wood', 'marble', 'green', 'blue', 'coral', 'slate'];
 
 export class Settings {
   constructor(root, { settings, onChange, onBack }) {
@@ -24,7 +28,7 @@ export class Settings {
     const toggles = TOGGLES.map(
       ([key, label]) => `
         <div class="field row-between">
-          <span>${label}</span>
+          <span>${t(label)}</span>
           <label class="switch">
             <input type="checkbox" data-key="${key}" ${this.settings[key] ? 'checked' : ''}/>
             <span class="track"></span>
@@ -32,21 +36,23 @@ export class Settings {
         </div>`,
     ).join('');
 
-    const themes = ['wood', 'marble', 'green', 'blue', 'coral', 'slate']
+    const themes = THEMES
       .map(
-        (t) =>
-          `<button data-theme="${t}" class="${this.settings.theme === t ? 'selected' : ''}">${
-            t[0].toUpperCase() + t.slice(1)
-          }</button>`,
+        (name) =>
+          `<button data-theme="${name}" class="${this.settings.theme === name ? 'selected' : ''}">${t(`theme.${name}`)}</button>`,
       )
       .join('');
 
     this.root.innerHTML = `
       <div class="panel">
-        <h2>Settings</h2>
+        <h2>${t('settings.title')}</h2>
         ${toggles}
-        <div class="field"><label>Board theme</label><div class="option-row">${themes}</div></div>
-        <div class="actions"><button class="primary" data-act="back">Back to Menu</button></div>
+        <div class="field row-between">
+          <span>${t('settings.language')}</span>
+          <button class="lang-pick" data-act="language">🌐 ${currentLanguageLabel()}</button>
+        </div>
+        <div class="field"><label>${t('settings.boardTheme')}</label><div class="option-row">${themes}</div></div>
+        <div class="actions"><button class="primary" data-act="back">${t('common.backToMenu')}</button></div>
       </div>`;
 
     this.root.querySelectorAll('input[data-key]').forEach((input) => {
@@ -65,6 +71,17 @@ export class Settings {
         btn.classList.add('selected');
       };
     });
+    this.root.querySelector('[data-act="language"]').onclick = () => {
+      new LanguageModal({
+        onChoose: (code) => {
+          setLanguage(code);
+          this.settings.language = code;
+          saveSettings(this.settings);
+          this.onChange();
+          this.render(); // re-render Settings in the newly chosen language
+        },
+      });
+    };
     this.root.querySelector('[data-act="back"]').onclick = () => this.onBack();
   }
 }

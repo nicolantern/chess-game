@@ -5,6 +5,7 @@
 import { api } from '../utils/api.js';
 import { setSession } from '../utils/session.js';
 import { loadProfile, saveProfile } from '../utils/profile.js';
+import { t } from '../utils/i18n.js';
 
 export class AccountScreen {
   constructor(root, { onDone, onBack }) {
@@ -20,25 +21,25 @@ export class AccountScreen {
     const isLogin = this.mode === 'login';
     this.root.innerHTML = `
       <div class="panel account">
-        <h2>${isLogin ? 'Log In' : 'Sign Up'}</h2>
-        <p class="subtitle">Sync your stats, rating, achievements, and saved games across devices.</p>
+        <h2>${isLogin ? t('account.login') : t('account.signup')}</h2>
+        <p class="subtitle">${t('account.subtitle')}</p>
 
         <div class="tabs">
-          <button data-tab="login" class="${isLogin ? 'selected' : ''}">Log In</button>
-          <button data-tab="register" class="${!isLogin ? 'selected' : ''}">Sign Up</button>
+          <button data-tab="login" class="${isLogin ? 'selected' : ''}">${t('account.login')}</button>
+          <button data-tab="register" class="${!isLogin ? 'selected' : ''}">${t('account.signup')}</button>
         </div>
 
         <form class="account-form">
-          <label class="num">Username
+          <label class="num">${t('account.username')}
             <input name="username" type="text" autocomplete="username" maxlength="24"
-                   placeholder="3–24 letters, numbers, _"/></label>
-          <label class="num">Password
+                   placeholder="${t('account.userPlaceholder')}"/></label>
+          <label class="num">${t('account.password')}
             <input name="password" type="password" autocomplete="${isLogin ? 'current-password' : 'new-password'}"
-                   placeholder="at least 6 characters"/></label>
+                   placeholder="${t('account.passPlaceholder')}"/></label>
           <div class="form-error" role="alert"></div>
           <div class="actions">
-            <button type="button" data-act="back">Back</button>
-            <button type="submit" class="primary">${isLogin ? 'Log In' : 'Create Account'}</button>
+            <button type="button" data-act="back">${t('common.back')}</button>
+            <button type="submit" class="primary">${isLogin ? t('account.login') : t('account.createAccount')}</button>
           </div>
         </form>
       </div>`;
@@ -79,7 +80,7 @@ export class AccountScreen {
       }
       this.onDone();
     } catch (err) {
-      this._setError(err.message || 'Something went wrong.');
+      this._setError(err.message || t('account.genericError'));
       this._setPending(false);
     }
   }
@@ -88,7 +89,7 @@ export class AccountScreen {
     this.pending = on;
     const submit = this.form.querySelector('button[type="submit"]');
     submit.disabled = on;
-    submit.textContent = on ? 'Please wait…' : this.mode === 'login' ? 'Log In' : 'Create Account';
+    submit.textContent = on ? t('account.pleaseWait') : this.mode === 'login' ? t('account.login') : t('account.createAccount');
   }
 
   _setError(msg) {

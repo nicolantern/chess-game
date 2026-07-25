@@ -5,6 +5,7 @@ import { loadProfile, saveProfile, resetStats, computeAchievements } from '../ut
 import { toPgn } from '../utils/pgn.js';
 import { DIFFICULTY_LABELS } from '../ai/difficulty.js';
 import { WHITE } from '../engine/pieces.js';
+import { t } from '../utils/i18n.js';
 
 const fmtDuration = (ms) => {
   const total = Math.round(ms / 1000);
@@ -33,24 +34,24 @@ export class StatsScreen {
       `<div class="stat-tile"><span class="v">${value}</span><span class="l">${label}</span></div>`;
 
     const tiles = [
-      tile('Rating (Elo)', s.rating),
-      tile('Games played', s.total),
-      tile('Wins vs AI', s.wins),
-      tile('Losses vs AI', s.losses),
-      tile('Draws vs AI', s.draws),
-      tile('Win rate', `${winRate}%`),
-      tile('Best streak', s.bestStreak),
-      tile('Flawless wins', s.flawlessWins),
-      tile('Fastest mate', s.fastestMateMoves != null ? `${s.fastestMateMoves} moves` : '—'),
-      tile('Avg duration', avgDur),
-      tile('Avg moves', avgMoves),
-      tile('Online W/L/D', `${s.onlineWins || 0}/${s.onlineLosses || 0}/${s.onlineDraws || 0}`),
+      tile(t('stats.rating'), s.rating),
+      tile(t('stats.gamesPlayed'), s.total),
+      tile(t('stats.winsAi'), s.wins),
+      tile(t('stats.lossesAi'), s.losses),
+      tile(t('stats.drawsAi'), s.draws),
+      tile(t('stats.winRate'), `${winRate}%`),
+      tile(t('stats.bestStreak'), s.bestStreak),
+      tile(t('stats.flawlessWins'), s.flawlessWins),
+      tile(t('stats.fastestMate'), s.fastestMateMoves != null ? t('stats.moves', { n: s.fastestMateMoves }) : '—'),
+      tile(t('stats.avgDuration'), avgDur),
+      tile(t('stats.avgMoves'), avgMoves),
+      tile(t('stats.onlineWld'), `${s.onlineWins || 0}/${s.onlineLosses || 0}/${s.onlineDraws || 0}`),
     ].join('');
 
-    const levelRows = Object.entries(DIFFICULTY_LABELS)
-      .map(([key, label]) => {
+    const levelRows = Object.keys(DIFFICULTY_LABELS)
+      .map((key) => {
         const b = s.byLevel[key] || { w: 0, l: 0, d: 0 };
-        return `<tr><td>${label}</td><td>${b.w}</td><td>${b.l}</td><td>${b.d}</td></tr>`;
+        return `<tr><td>${t(`diff.${key}`)}</td><td>${b.w}</td><td>${b.l}</td><td>${b.d}</td></tr>`;
       })
       .join('');
 
@@ -59,42 +60,42 @@ export class StatsScreen {
           .map(
             (g) => `
           <div class="saved-game" data-id="${g.id}">
-            <div class="sg-info"><strong>${g.name}</strong><span>${g.date} · ${g.sans.length} plies</span></div>
+            <div class="sg-info"><strong>${g.name}</strong><span>${g.date} · ${t('stats.plies', { n: g.sans.length })}</span></div>
             <div class="sg-actions">
-              <button data-sg="replay">Replay</button>
-              <button data-sg="pgn">PGN</button>
+              <button data-sg="replay">${t('stats.replay')}</button>
+              <button data-sg="pgn">${t('stats.pgn')}</button>
               <button data-sg="delete" class="ghost">✕</button>
             </div>
           </div>`,
           )
           .join('')
-      : '<p class="subtitle">No saved games yet. Finish a game and choose “Save Game”.</p>';
+      : `<p class="subtitle">${t('stats.noSaved')}</p>`;
 
     this.root.innerHTML = `
       <div class="panel stats">
-        <h2>Profile &amp; Stats</h2>
+        <h2>${t('stats.title')}</h2>
         <div class="field row-between">
-          <label for="pname">Player name</label>
+          <label for="pname">${t('stats.playerName')}</label>
           <input id="pname" class="name-input" type="text" maxlength="24" value="${escapeHtml(this.profile.name)}"/>
         </div>
 
         <div class="stat-grid">${tiles}</div>
 
-        <h3>By difficulty (vs AI)</h3>
+        <h3>${t('stats.byDifficulty')}</h3>
         <table class="level-table">
-          <thead><tr><th>Level</th><th>W</th><th>L</th><th>D</th></tr></thead>
+          <thead><tr><th>${t('stats.level')}</th><th>W</th><th>L</th><th>D</th></tr></thead>
           <tbody>${levelRows}</tbody>
         </table>
 
-        <h3>Achievements</h3>
+        <h3>${t('stats.achievements')}</h3>
         <div class="ach-grid">${this._achievementsHtml()}</div>
 
-        <h3>Saved games</h3>
+        <h3>${t('stats.savedGames')}</h3>
         <div class="saved-list">${saved}</div>
 
         <div class="actions">
-          <button data-act="reset" class="ghost">Reset stats</button>
-          <button class="primary" data-act="back">Back to Menu</button>
+          <button data-act="reset" class="ghost">${t('stats.reset')}</button>
+          <button class="primary" data-act="back">${t('common.backToMenu')}</button>
         </div>
       </div>`;
 
@@ -125,7 +126,7 @@ export class StatsScreen {
 
     this.root.querySelector('[data-act="back"]').onclick = () => this.onBack();
     this.root.querySelector('[data-act="reset"]').onclick = () => {
-      if (confirm('Reset all statistics? Saved games are kept.')) {
+      if (confirm(t('stats.resetConfirm'))) {
         this.profile = resetStats(this.profile);
         this.render();
       }
@@ -160,12 +161,12 @@ export class StatsScreen {
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
       <div class="modal">
-        <h2>PGN</h2>
+        <h2>${t('pgn.title')}</h2>
         <textarea class="pgn-text" readonly>${escapeHtml(pgn)}</textarea>
         <div class="actions">
-          <button data-p="copy">Copy</button>
-          <button data-p="download">Download</button>
-          <button class="primary" data-p="close">Close</button>
+          <button data-p="copy">${t('pgn.copy')}</button>
+          <button data-p="download">${t('pgn.download')}</button>
+          <button class="primary" data-p="close">${t('pgn.close')}</button>
         </div>
       </div>`;
     const close = () => backdrop.remove();
@@ -175,7 +176,7 @@ export class StatsScreen {
     backdrop.querySelector('[data-p="close"]').onclick = close;
     backdrop.querySelector('[data-p="copy"]').onclick = () => {
       navigator.clipboard?.writeText(pgn).catch(() => {});
-      backdrop.querySelector('[data-p="copy"]').textContent = 'Copied';
+      backdrop.querySelector('[data-p="copy"]').textContent = t('pgn.copied');
     };
     backdrop.querySelector('[data-p="download"]').onclick = () => {
       const blob = new Blob([pgn], { type: 'application/x-chess-pgn' });

@@ -89,12 +89,19 @@ function persist() {
 // by the server at boot, before any request is served).
 if (!PG_URL) loadFile();
 
-/** Async boot hook. No-op in file mode; connects + loads in Postgres mode. */
-export async function initStore() {
+/**
+ * Async boot hook. No-op in file mode; connects + loads in Postgres mode.
+ * `opts.pool` injects a pg-compatible pool (used by tests) instead of a real one.
+ */
+export async function initStore(opts = {}) {
   if (!PG_URL) return;
-  const { default: pg } = await import('pg');
-  // Neon/Supabase require SSL; skip cert verification for portability across hosts.
-  pool = new pg.Pool({ connectionString: PG_URL, ssl: { rejectUnauthorized: false } });
+  if (opts.pool) {
+    pool = opts.pool;
+  } else {
+    const { default: pg } = await import('pg');
+    // Neon/Supabase require SSL; skip cert verification for portability across hosts.
+    pool = new pg.Pool({ connectionString: PG_URL, ssl: { rejectUnauthorized: false } });
+  }
   await pool.query('CREATE TABLE IF NOT EXISTS kv (id text PRIMARY KEY, data jsonb NOT NULL)');
   const { rows } = await pool.query('SELECT data FROM kv WHERE id = $1', ['db']);
   if (rows[0]) db = rows[0].data;

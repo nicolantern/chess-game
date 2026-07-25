@@ -24,18 +24,16 @@ function makeFakePg(initialDoc = null) {
 
 async function freshPgStore(fake) {
   vi.resetModules();
-  process.env.DATABASE_URL = 'postgres://fake/db';
+  process.env.DATABASE_URL = 'postgres://fake/db'; // any truthy value enables the PG backend
   delete process.env.DATA_FILE; // ensure file backend can't interfere
-  vi.doMock('pg', () => ({ default: { Pool: vi.fn(() => fake.pool) } }));
   const store = await import('../../server/store.js');
-  await store.initStore();
+  await store.initStore({ pool: fake.pool }); // inject the fake pool (no real pg)
   return store;
 }
 
 describe('postgres store backend', () => {
   afterEach(() => {
     delete process.env.DATABASE_URL;
-    vi.doUnmock('pg');
     vi.resetModules();
   });
 

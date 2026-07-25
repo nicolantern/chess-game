@@ -5,6 +5,7 @@
 
 import { TIME_PRESETS } from './timeControls.js';
 import { FriendsPanel } from './FriendsPanel.js';
+import { t } from '../utils/i18n.js';
 
 export class OnlineScreen {
   constructor(root, { realtime, onCancel, snapshot, onRefresh, onChallenge }) {
@@ -41,24 +42,24 @@ export class OnlineScreen {
             }">${label}</button>`,
         )
         .join('');
-      return `<div class="tc-cat"><span class="tc-label">${cat}</span><div class="option-row">${buttons}</div></div>`;
+      return `<div class="tc-cat"><span class="tc-label">${t(`tc.${cat.toLowerCase()}`)}</span><div class="option-row">${buttons}</div></div>`;
     }).join('');
 
     this.matchHost.innerHTML = `
       <div class="panel">
-        <h2>Play Online</h2>
-        <p class="subtitle">You'll be matched with another player choosing the same time control.</p>
-        <div class="field"><label>Time control</label>
+        <h2>${t('online.title')}</h2>
+        <p class="subtitle">${t('online.subtitle')}</p>
+        <div class="field"><label>${t('time.control')}</label>
           <div class="time-presets">
             ${rows}
-            <div class="tc-cat"><span class="tc-label">Other</span><div class="option-row">
-              <button data-key="unlimited">Unlimited</button>
+            <div class="tc-cat"><span class="tc-label">${t('time.other')}</span><div class="option-row">
+              <button data-key="unlimited">${t('time.unlimited')}</button>
             </div></div>
           </div>
         </div>
         <div class="actions">
-          <button data-act="back">Back</button>
-          <button class="primary" data-act="find">Find Opponent</button>
+          <button data-act="back">${t('common.back')}</button>
+          <button class="primary" data-act="find">${t('online.find')}</button>
         </div>
       </div>`;
 
@@ -83,10 +84,10 @@ export class OnlineScreen {
   _renderWaiting() {
     this.matchHost.innerHTML = `
       <div class="panel waiting">
-        <h2>Finding an opponent…</h2>
+        <h2>${t('online.finding')}</h2>
         <div class="spinner"></div>
-        <p class="subtitle">Waiting for another player. This stays open until someone joins.</p>
-        <div class="actions"><button data-act="cancel">Cancel</button></div>
+        <p class="subtitle">${t('online.waiting')}</p>
+        <div class="actions"><button data-act="cancel">${t('common.cancel')}</button></div>
       </div>`;
     this.matchHost.querySelector('[data-act="cancel"]').onclick = () => {
       this.realtime.cancel();

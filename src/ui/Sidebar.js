@@ -5,18 +5,20 @@
 import { PIECE_GLYPH } from '../assets/pieces.js';
 import { pieceColor, pieceType, PIECE_VALUE, WHITE, BLACK } from '../engine/pieces.js';
 import { CLASS_SYMBOL as SYMBOL } from '../ai/analysis.js';
+import { t } from '../utils/i18n.js';
 
-const STATUS_TEXT = {
-  playing: '',
-  check: 'Check!',
-  checkmate: 'Checkmate',
-  stalemate: 'Stalemate — draw',
-  'draw-insufficient': 'Draw — insufficient material',
-  'draw-fifty': 'Draw — fifty-move rule',
-  'draw-repetition': 'Draw — threefold repetition',
-  timeout: 'Time out',
-  resign: 'Resignation',
+// Localized status-line text for a game state (empty while simply playing).
+const STATUS_KEY = {
+  check: 'status.check',
+  checkmate: 'status.checkmate',
+  stalemate: 'status.stalemate',
+  'draw-insufficient': 'status.drawInsufficient',
+  'draw-fifty': 'status.drawFifty',
+  'draw-repetition': 'status.drawRepetition',
+  timeout: 'status.timeout',
+  resign: 'status.resign',
 };
+const statusText = (status) => (STATUS_KEY[status] ? t(STATUS_KEY[status]) : '');
 
 function formatTime(ms) {
   const total = Math.max(0, Math.ceil(ms / 1000));
@@ -54,15 +56,15 @@ export class Sidebar {
       <div class="analysis-summary" hidden></div>
       <div class="clock bottom"><span class="who"></span><span class="tray captured"></span><span class="time"></span></div>
       <div class="controls">
-        <button data-act="hint" title="Show best move">💡 Hint</button>
-        <button data-act="analyze" title="Analyze game">🔬 Analyze</button>
-        <button data-act="undo" title="Undo (←/U)">↶ Undo</button>
-        <button data-act="flip" title="Flip board (F)">⇅ Flip</button>
-        <button data-act="draw" disabled>½ Draw</button>
-        <button data-act="resign">⚑ Resign</button>
-        <button data-act="fullscreen" title="Fullscreen (Shift+F)">⛶ Fullscreen</button>
-        <button data-act="new" title="New game (N)">↻ New Game</button>
-        <button data-act="menu" title="Menu">☰ Menu</button>
+        <button data-act="hint" title="${t('ctl.hintTitle')}">${t('ctl.hint')}</button>
+        <button data-act="analyze" title="${t('ctl.analyzeTitle')}">${t('ctl.analyze')}</button>
+        <button data-act="undo" title="${t('ctl.undoTitle')}">${t('ctl.undo')}</button>
+        <button data-act="flip" title="${t('ctl.flipTitle')}">${t('ctl.flip')}</button>
+        <button data-act="draw" disabled>${t('ctl.draw')}</button>
+        <button data-act="resign">${t('ctl.resign')}</button>
+        <button data-act="fullscreen" title="${t('ctl.fullscreenTitle')}">${t('ctl.fullscreen')}</button>
+        <button data-act="new" title="${t('ctl.newTitle')}">${t('ctl.new')}</button>
+        <button data-act="menu" title="${t('ctl.menuTitle')}">${t('ctl.menu')}</button>
       </div>`;
     this.elTop = this.root.querySelector('.clock.top');
     this.elBottom = this.root.querySelector('.clock.bottom');
@@ -96,7 +98,7 @@ export class Sidebar {
     const status = this.controller.statusPayload();
     const active = this.controller.game.isOver ? -1 : status.sideToMove;
     const paint = (el, color) => {
-      el.querySelector('.who').textContent = color === WHITE ? 'White' : 'Black';
+      el.querySelector('.who').textContent = color === WHITE ? t('side.white') : t('side.black');
       el.querySelector('.time').textContent = this.unlimited ? '∞' : formatTime(remaining[color]);
       el.classList.toggle('active', active === color);
       el.classList.toggle('low', !this.unlimited && remaining[color] < 30000);
@@ -119,10 +121,11 @@ export class Sidebar {
   }
 
   _renderStatus(s) {
-    let text = STATUS_TEXT[s.status] || '';
+    let text = statusText(s.status);
     if (this.controller.game.isOver || s.status === 'timeout' || s.status === 'resign') {
       if (s.status === 'checkmate' || s.status === 'timeout' || s.status === 'resign') {
-        text = `${STATUS_TEXT[s.status]} — ${s.winner === WHITE ? 'White' : 'Black'} wins`;
+        const winner = s.winner === WHITE ? t('side.white') : t('side.black');
+        text = `${statusText(s.status)} — ${t('status.wins', { name: winner })}`;
       }
     }
     this.elStatus.classList.toggle('alert', Boolean(text));
@@ -134,7 +137,7 @@ export class Sidebar {
   _renderThinking(on) {
     if (on) {
       this.elStatus.classList.add('alert');
-      this.elStatus.innerHTML = '<span class="thinking-dot"></span> AI is thinking…';
+      this.elStatus.innerHTML = `<span class="thinking-dot"></span> ${t('ai.thinking')}`;
     } else {
       this._renderStatus(this.controller.statusPayload());
     }
@@ -191,6 +194,6 @@ export class Sidebar {
     };
     this.elAnalysis.hidden = false;
     this.elAnalysis.innerHTML =
-      `<div class="an-title">Accuracy</div>${side(WHITE, 'White')}${side(BLACK, 'Black')}`;
+      `<div class="an-title">${t('analysis.accuracy')}</div>${side(WHITE, t('side.white'))}${side(BLACK, t('side.black'))}`;
   }
 }

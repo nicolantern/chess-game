@@ -16,6 +16,7 @@ import { loadProfile, saveProfile, recordGame, computeAchievements } from '../ut
 import { saveInProgress, clearInProgress } from '../utils/persistence.js';
 import { searchBestMove } from '../ai/search.js';
 import { analyzeGame } from '../ai/analysis.js';
+import { t } from '../utils/i18n.js';
 
 // Format ms as m:ss for the game-over summary.
 function fmtDuration(ms) {
@@ -30,17 +31,18 @@ function dateStamp(ms) {
   return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
 }
 
-const GAMEOVER_TITLE = {
-  checkmate: 'Checkmate',
-  stalemate: 'Stalemate',
-  'draw-insufficient': 'Draw',
-  'draw-fifty': 'Draw',
-  'draw-repetition': 'Draw',
-  'draw-agreed': 'Draw Agreed',
-  timeout: 'Time Out',
-  resign: 'Resignation',
-  abandoned: 'Opponent Left',
+const GAMEOVER_KEY = {
+  checkmate: 'over.checkmate',
+  stalemate: 'over.stalemate',
+  'draw-insufficient': 'over.draw',
+  'draw-fifty': 'over.draw',
+  'draw-repetition': 'over.draw',
+  'draw-agreed': 'over.drawAgreed',
+  timeout: 'over.timeout',
+  resign: 'over.resign',
+  abandoned: 'over.abandoned',
 };
+const gameoverTitle = (status) => (GAMEOVER_KEY[status] ? t(GAMEOVER_KEY[status]) : t('over.gameOver'));
 
 export class GameScreen {
   constructor(root, { config, settings, onExit, loadData = null }) {
@@ -311,7 +313,7 @@ export class GameScreen {
     this._analyzing = true;
     const total = moves.length;
     const { perMove, summary } = await analyzeGame(moves, {
-      onProgress: (done) => this.sidebar.setMessage(`🔬 Analyzing… ${Math.round((done / total) * 100)}%`),
+      onProgress: (done) => this.sidebar.setMessage(t('analyze.progress', { pct: Math.round((done / total) * 100) })),
     });
     this._analyzing = false;
     this.sidebar.setAnalysis(perMove, summary);
@@ -348,7 +350,7 @@ export class GameScreen {
       case 'draw':
         if (this.online) {
           this.realtime.offerDraw();
-          this.sidebar.setMessage('Draw offered…');
+          this.sidebar.setMessage(t('draw.offered'));
         } else {
           this.controller.claimDraw();
         }
@@ -398,17 +400,17 @@ export class GameScreen {
     const recorded = this._recordStats(s);
 
     let subtitle = '';
-    if (s.status === 'stalemate' || s.status.startsWith('draw')) subtitle = 'The game is a draw.';
-    else if (s.winner != null) subtitle = `${s.winner === WHITE ? 'White' : 'Black'} wins.`;
+    if (s.status === 'stalemate' || s.status.startsWith('draw')) subtitle = t('over.drawMsg');
+    else if (s.winner != null) subtitle = t('over.wins', { name: s.winner === WHITE ? t('side.white') : t('side.black') });
 
     const durationMs = Date.now() - this.controller.startedAt;
     const halfMoves = this.controller.game.history.length;
     const avgMs = halfMoves ? durationMs / halfMoves : 0;
-    let meta = `Duration ${fmtDuration(durationMs)} · ${halfMoves} plies · avg ${(avgMs / 1000).toFixed(1)}s/move`;
+    let meta = t('over.meta', { d: fmtDuration(durationMs), n: halfMoves, a: (avgMs / 1000).toFixed(1) });
     if (recorded && recorded.mode === 'ai') {
       const delta = recorded.ratingAfter - recorded.ratingBefore;
       const sign = delta >= 0 ? '+' : '';
-      meta += `<br>Rating ${recorded.ratingAfter} (${sign}${delta})`;
+      meta += `<br>${t('over.rating', { r: recorded.ratingAfter, sign, delta })}`;
     }
     if (recorded && recorded.unlocked.length) {
       recorded.unlocked.forEach((a, i) => setTimeout(() => this._toast(a), 400 + i * 900));
@@ -419,13 +421,13 @@ export class GameScreen {
     this.modal.className = 'modal-backdrop';
     this.modal.innerHTML = `
       <div class="modal">
-        <h2>${GAMEOVER_TITLE[s.status] || 'Game Over'}</h2>
+        <h2>${gameoverTitle(s.status)}</h2>
         <p>${subtitle}</p>
         <p class="meta">${meta}</p>
         <div class="actions">
-          <button data-act="menu">Menu</button>
-          <button data-act="save">★ Save Game</button>
-          <button class="primary" data-act="new">New Game</button>
+          <button data-act="menu">${t('btn.menu')}</button>
+          <button data-act="save">${t('btn.save')}</button>
+          <button class="primary" data-act="new">${t('btn.new')}</button>
         </div>
       </div>`;
     this.modal.querySelector('[data-act="new"]').onclick = () => this._handleControl('new');
@@ -433,7 +435,7 @@ export class GameScreen {
     const saveBtn = this.modal.querySelector('[data-act="save"]');
     saveBtn.onclick = () => {
       this._saveGame(s);
-      saveBtn.textContent = '✓ Saved';
+      saveBtn.textContent = t('btn.saved');
       saveBtn.disabled = true;
     };
     document.body.appendChild(this.modal);
@@ -447,11 +449,11 @@ export class GameScreen {
     this._recordOnlineStats(s);
 
     let subtitle = '';
-    if (s.status === 'stalemate' || s.status.startsWith('draw')) subtitle = 'The game is a draw.';
-    else if (s.status === 'abandoned') subtitle = `${this.controller.opponentName} left — you win.`;
+    if (s.status === 'stalemate' || s.status.startsWith('draw')) subtitle = t('over.drawMsg');
+    else if (s.status === 'abandoned') subtitle = t('over.oppLeft', { name: this.controller.opponentName });
     else if (s.winner != null) {
       const iWon = s.winner === this.humanColor;
-      subtitle = iWon ? 'You win!' : `${this.controller.opponentName} wins.`;
+      subtitle = iWon ? t('over.youWin') : t('over.wins', { name: this.controller.opponentName });
     }
 
     this._removeModal();
@@ -459,18 +461,18 @@ export class GameScreen {
     this.modal.className = 'modal-backdrop';
     this.modal.innerHTML = `
       <div class="modal">
-        <h2>${GAMEOVER_TITLE[s.status] || 'Game Over'}</h2>
+        <h2>${gameoverTitle(s.status)}</h2>
         <p>${subtitle}</p>
         <div class="actions">
-          <button data-act="menu">Leave</button>
-          <button class="primary" data-act="rematch">Rematch</button>
+          <button data-act="menu">${t('btn.leave')}</button>
+          <button class="primary" data-act="rematch">${t('btn.rematch')}</button>
         </div>
       </div>`;
     this.modal.querySelector('[data-act="menu"]').onclick = () => this._handleControl('menu');
     const rematchBtn = this.modal.querySelector('[data-act="rematch"]');
     rematchBtn.onclick = () => {
       this.realtime.rematchOffer();
-      rematchBtn.textContent = 'Waiting for opponent…';
+      rematchBtn.textContent = t('btn.waitingOpp');
       rematchBtn.disabled = true;
     };
     document.body.appendChild(this.modal);
@@ -562,13 +564,13 @@ export class GameScreen {
       const btn = this.sidebarEl.querySelector(`[data-act="${a}"]`);
       if (btn) btn.style.display = 'none';
     });
-    this.sidebar.setMessage(`🌐 Online — vs ${this.controller.opponentName}`);
+    this.sidebar.setMessage(t('online.msg', { name: this.controller.opponentName }));
     this._rtOff.push(
       rt.on('move', (m) => this.controller.applyRemoteMove(m.move, m.clock)),
       rt.on('resign', () => this.controller.endGame('resign', this.humanColor)), // opp resigned → I win
       rt.on('drawOffer', () => this._promptDraw()),
       rt.on('drawAccept', () => this.controller.endGame('draw-agreed', null)),
-      rt.on('drawDecline', () => this.sidebar.setMessage('Draw declined.')),
+      rt.on('drawDecline', () => this.sidebar.setMessage(t('draw.declined'))),
       rt.on('rematchOffer', () => this._promptRematch()),
       rt.on('opponentLeft', () => this.controller.endGame('abandoned', this.humanColor)),
       rt.on('close', () => {
@@ -578,7 +580,7 @@ export class GameScreen {
   }
 
   // A small yes/no modal used for draw and rematch offers.
-  _prompt(title, onYes, yesLabel = 'Accept', noLabel = 'Decline') {
+  _prompt(title, onYes, yesLabel = t('common.accept'), noLabel = t('common.decline')) {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
@@ -600,7 +602,7 @@ export class GameScreen {
   }
 
   _promptDraw() {
-    this._prompt(`${this.controller.opponentName} offers a draw`, () => {
+    this._prompt(t('draw.offers', { name: this.controller.opponentName }), () => {
       this.realtime.acceptDraw();
       this.controller.endGame('draw-agreed', null);
     });
@@ -611,9 +613,9 @@ export class GameScreen {
   }
 
   _promptRematch() {
-    this._prompt(`${this.controller.opponentName} wants a rematch`, () => {
+    this._prompt(t('rematch.wants', { name: this.controller.opponentName }), () => {
       this.realtime.rematchAccept();
-    }, 'Play again', 'No thanks');
+    }, t('rematch.playAgain'), t('rematch.noThanks'));
   }
 
   // Transient "achievement unlocked" popup.
@@ -622,7 +624,7 @@ export class GameScreen {
     el.className = 'toast';
     el.innerHTML =
       `<span class="t-ico">${achievement.icon}</span>` +
-      `<div class="t-body"><strong>Achievement unlocked</strong>` +
+      `<div class="t-body"><strong>${t('ach.unlocked')}</strong>` +
       `<span>${achievement.label} — ${achievement.desc}</span></div>`;
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add('show'));

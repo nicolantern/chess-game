@@ -160,27 +160,27 @@ export class HomeScreen {
             key === presetKey(m, i) ? 'selected' : ''
           }">${label}</button>`)
         .join('');
-      return `<div class="tc-cat"><span class="tc-label">${cat}</span><div class="option-row">${buttons}</div></div>`;
+      return `<div class="tc-cat"><span class="tc-label">${esc(t(`tc.${cat.toLowerCase()}`))}</span><div class="option-row">${buttons}</div></div>`;
     }).join('');
 
     const c = this.config.time;
     const customPanel = `
       <div class="custom-time" ${key === 'custom' ? '' : 'hidden'}>
         <div class="option-row">
-          <label class="num">Minutes<input type="number" min="0" max="180" step="1" data-cf="minutes" value="${key === 'custom' ? c.minutes ?? 5 : 5}"/></label>
-          <label class="num">Increment (s)<input type="number" min="0" max="60" step="1" data-cf="increment" value="${key === 'custom' ? c.increment : 0}"/></label>
-          <label class="num">Delay (s)<input type="number" min="0" max="60" step="1" data-cf="delay" value="${key === 'custom' ? c.delay : 0}"/></label>
+          <label class="num">${esc(t('time.minutes'))}<input type="number" min="0" max="180" step="1" data-cf="minutes" value="${key === 'custom' ? c.minutes ?? 5 : 5}"/></label>
+          <label class="num">${esc(t('time.increment'))}<input type="number" min="0" max="60" step="1" data-cf="increment" value="${key === 'custom' ? c.increment : 0}"/></label>
+          <label class="num">${esc(t('time.delay'))}<input type="number" min="0" max="60" step="1" data-cf="delay" value="${key === 'custom' ? c.delay : 0}"/></label>
         </div>
       </div>`;
 
     return `
       <div class="field">
-        <label>Time control</label>
+        <label>${esc(t('time.control'))}</label>
         <div class="time-presets">
           ${categories}
-          <div class="tc-cat"><span class="tc-label">Other</span><div class="option-row">
-            <button data-tc="unlimited" class="${key === 'unlimited' ? 'selected' : ''}">Unlimited</button>
-            <button data-tc="custom" class="${key === 'custom' ? 'selected' : ''}">Custom…</button>
+          <div class="tc-cat"><span class="tc-label">${esc(t('time.other'))}</span><div class="option-row">
+            <button data-tc="unlimited" class="${key === 'unlimited' ? 'selected' : ''}">${esc(t('time.unlimited'))}</button>
+            <button data-tc="custom" class="${key === 'custom' ? 'selected' : ''}">${esc(t('time.custom'))}</button>
           </div></div>
         </div>
         ${customPanel}
@@ -227,22 +227,22 @@ export class HomeScreen {
 
   // --- Play vs AI ("Play Bots") --------------------------------------------
   renderAIConfig() {
-    const levels = Object.entries(DIFFICULTY_LABELS)
-      .map(([key, label]) => `<button data-level="${key}" class="${this.config.aiLevel === key ? 'selected' : ''}">${label}</button>`)
+    const levels = Object.keys(DIFFICULTY_LABELS)
+      .map((key) => `<button data-level="${key}" class="${this.config.aiLevel === key ? 'selected' : ''}">${esc(t(`diff.${key}`))}</button>`)
       .join('');
-    const colors = [['white', 'White'], ['black', 'Black'], ['random', 'Random']]
-      .map(([id, label]) => `<button data-color="${id}" class="${this.config.aiColorChoice === id ? 'selected' : ''}">${label}</button>`)
+    const colors = [['white', 'color.white'], ['black', 'color.black'], ['random', 'color.random']]
+      .map(([id, label]) => `<button data-color="${id}" class="${this.config.aiColorChoice === id ? 'selected' : ''}">${esc(t(label))}</button>`)
       .join('');
 
     this.root.innerHTML = `
       <div class="panel home-panel">
-        <h2>Play Bots</h2>
-        <div class="field"><label>Difficulty</label><div class="option-row">${levels}</div></div>
-        <div class="field"><label>You play</label><div class="option-row">${colors}</div></div>
+        <h2>${esc(t('bots.title'))}</h2>
+        <div class="field"><label>${esc(t('bots.difficulty'))}</label><div class="option-row">${levels}</div></div>
+        <div class="field"><label>${esc(t('bots.youPlay'))}</label><div class="option-row">${colors}</div></div>
         ${this._timeField()}
         <div class="actions">
-          <button data-act="back">Back</button>
-          <button class="primary" data-act="start">Start Game</button>
+          <button data-act="back">${esc(t('common.back'))}</button>
+          <button class="primary" data-act="start">${esc(t('common.startGame'))}</button>
         </div>
       </div>`;
 
@@ -270,12 +270,12 @@ export class HomeScreen {
   renderPvPConfig() {
     this.root.innerHTML = `
       <div class="panel home-panel">
-        <h2>Pass &amp; Play</h2>
-        <p class="subtitle">Two players, one device. White moves first.</p>
+        <h2>${esc(t('pvp.title'))}</h2>
+        <p class="subtitle">${esc(t('pvp.subtitle'))}</p>
         ${this._timeField()}
         <div class="actions">
-          <button data-act="back">Back</button>
-          <button class="primary" data-act="start">Start Game</button>
+          <button data-act="back">${esc(t('common.back'))}</button>
+          <button class="primary" data-act="start">${esc(t('common.startGame'))}</button>
         </div>
       </div>`;
     this._bindTimeField();
