@@ -67,6 +67,7 @@ export class HomeScreen {
           <li><button class="nav-item" data-nav="settings"><span class="ni">⚙️</span> ${esc(t('nav.settings'))}</button></li>
         </ul>
         <button class="nav-lang" data-act="language">🌐 ${esc(currentLanguageLabel())}</button>
+        <button class="nav-lang" data-act="world">🌍 Explore 3D World</button>
         ${acct}
       </nav>`;
   }
@@ -131,6 +132,7 @@ export class HomeScreen {
     this.root.querySelector('[data-nav="stats"]').onclick = () => this.onNavigate('stats');
     this.root.querySelector('[data-nav="settings"]').onclick = () => this.onNavigate('settings');
     this.root.querySelector('[data-act="language"]').onclick = () => this.onLanguage();
+    this.root.querySelector('[data-act="world"]').onclick = () => { window.location.href = './world.html'; };
     const logout = this.root.querySelector('[data-act="logout"]');
     if (logout) logout.onclick = () => this.account.onLogout();
     const acct = this.root.querySelector('[data-act="account"]');

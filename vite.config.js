@@ -7,6 +7,10 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 export default defineConfig({
   base: './',
   plugins: [viteSingleFile()],
+  // Only the chess app (index.html) is built here as a single inlined file. The
+  // 3D world (world.html) pulls in Three.js and is built separately (normal
+  // chunked output) via vite.world.config.js — see the "build" npm script — since
+  // the single-file plugin can't emit multiple pages.
   server: {
     host: '0.0.0.0',
     port: 3000,
