@@ -15,7 +15,7 @@ export class Input {
   constructor(canvas, overlay) {
     this.canvas = canvas;
     this.keys = new Set();
-    this.yaw = Math.PI; // start looking at the character's front
+    this.yaw = 0; // start behind the hero (see his back, sword & shield)
     this.pitch = 0.5;
     this.distance = 9;
     this.locked = false;
