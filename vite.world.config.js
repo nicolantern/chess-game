@@ -10,7 +10,7 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     rollupOptions: {
-      input: { world: 'world.html' },
+      input: { world: 'world.html', mc: 'mc.html' },
     },
   },
 });
