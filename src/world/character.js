@@ -13,6 +13,7 @@ const SPRINT_SPEED = 13;
 const JUMP_SPEED = 9;
 const TURN_RATE = 12;
 const EDGE = WORLD_SIZE / 2 - 6;
+const ATTACK_DUR = 0.45; // seconds for one sword swing
 
 const COL = {
   tunic: '#2f7d34',
@@ -126,12 +127,53 @@ export class Character {
     this.mesh = g;
     this.limbs = { legL, legR, armL, armR };
 
+    // A drawn sword in the right hand (shown only mid-swing) + a slash arc FX.
+    this.backSword = sword;
+    const handSword = new THREE.Group();
+    const hBlade = box(0.09, 1.1, 0.05, COL.steel);
+    hBlade.position.y = -0.62;
+    const hGuard = box(0.36, 0.09, 0.09, COL.gold);
+    const hHilt = box(0.08, 0.28, 0.08, COL.shieldBlue);
+    hHilt.position.y = 0.12;
+    handSword.add(hBlade, hGuard, hHilt);
+    handSword.position.set(0, -0.78, 0.05);
+    handSword.visible = false;
+    armR.add(handSword);
+    this.handSword = handSword;
+
+    const slash = new THREE.Mesh(
+      new THREE.RingGeometry(1.3, 2.1, 20, 1, -0.7, 1.4),
+      new THREE.MeshBasicMaterial({ color: '#c8f2ff', transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    slash.rotation.x = -Math.PI / 2;
+    slash.position.set(0, 1.0, 0.5);
+    g.add(slash);
+    this.slash = slash;
+
+    this.attackTime = -1; // <0 = not swinging
+    this.attackId = 0;
+    this.attackHitActive = false;
+    this._fwd = new THREE.Vector3();
+
     this.pos = new THREE.Vector3(0, heightAt(0, 0), 0);
     this.vy = 0;
     this.onGround = true;
     this.yaw = 0;
     this.walkPhase = 0;
     g.position.copy(this.pos);
+  }
+
+  /** Unit vector pointing where the hero faces (on the ground plane). */
+  forward() {
+    return this._fwd.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+  }
+
+  /** Begin a sword swing (ignored if one is already in progress). */
+  attack() {
+    if (this.attackTime >= 0) return false;
+    this.attackTime = 0;
+    this.attackId++;
+    return true;
   }
 
   /**
@@ -173,6 +215,29 @@ export class Character {
     this.limbs.legR.rotation.x = -swing;
     this.limbs.armL.rotation.x = -swing;
     this.limbs.armR.rotation.x = swing;
+
+    // Sword swing: overrides the right arm, draws the sword, opens a hit window.
+    if (this.attackTime >= 0) {
+      this.attackTime += dt;
+      const p = this.attackTime / ATTACK_DUR;
+      this.handSword.visible = true;
+      this.backSword.visible = false;
+      this.limbs.armR.rotation.x =
+        p < 0.25
+          ? THREE.MathUtils.lerp(-0.2, -1.5, p / 0.25) // wind up
+          : THREE.MathUtils.lerp(-1.5, 1.6, (p - 0.25) / 0.75); // chop down
+      this.attackHitActive = p > 0.28 && p < 0.55;
+      this.slash.material.opacity = this.attackHitActive ? 0.75 * (1 - (p - 0.28) / 0.27) : 0;
+      if (p >= 1) {
+        this.attackTime = -1;
+        this.attackHitActive = false;
+        this.handSword.visible = false;
+        this.backSword.visible = true;
+        this.slash.material.opacity = 0;
+      }
+    } else {
+      this.attackHitActive = false;
+    }
 
     this.mesh.position.copy(this.pos);
     this.mesh.rotation.y = this.yaw;

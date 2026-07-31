@@ -23,6 +23,15 @@
         position: fixed; right: 14px; top: 12px; z-index: 5;
         font: 600 13px system-ui; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6);
       }
+      #hearts {
+        position: fixed; left: 14px; top: 46px; z-index: 5;
+        font: 22px system-ui; color: #ff4d5e; letter-spacing: 2px;
+        text-shadow: 0 1px 3px rgba(0,0,0,.6);
+      }
+      #kills {
+        position: fixed; left: 16px; top: 78px; z-index: 5;
+        font: 600 14px system-ui; color: #ffe27a; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+      }
       #back {
         position: fixed; left: 14px; top: 12px; z-index: 6;
         font: 600 13px system-ui; color: #14181f; background: rgba(255,255,255,.85);
@@ -42,10 +51,12 @@
     <canvas id="scene"></canvas>
     <a id="back" href="./index.html">← Chess</a>
     <div id="fps">–– fps</div>
+    <div id="hearts">♥♥♥</div>
+    <div id="kills" data-n="-1">⚔ 0</div>
     <div id="hud">
-      <b>WASD</b> move · <b>Mouse</b> look · <b>Shift</b> sprint · <b>Space</b> jump · <b>Scroll</b> zoom · <b>Esc</b> release
+      <b>WASD</b> move · <b>Mouse</b> look · <b>Click / J</b> attack · <b>Shift</b> sprint · <b>Space</b> jump · <b>Scroll</b> zoom · <b>Esc</b> release
     </div>
-    <div id="overlay">Click to explore<small>WASD to move · mouse to look around</small></div>
+    <div id="overlay">Click to explore<small>WASD move · mouse look · click to swing your sword</small></div>
     <script type="module" src="/src/world/main.js"></script>
   </body>
 </html>

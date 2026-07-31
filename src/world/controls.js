@@ -20,13 +20,20 @@ export class Input {
     this.distance = 9;
     this.locked = false;
 
+    this._attack = false;
+
     addEventListener('keydown', (e) => {
       this.keys.add(e.code);
       if (e.code === 'Space') e.preventDefault();
+      if (e.code === 'KeyJ') this._attack = true; // keyboard attack
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
 
     canvas.addEventListener('click', () => canvas.requestPointerLock());
+    // Left mouse button swings the sword while the mouse is captured.
+    document.addEventListener('mousedown', (e) => {
+      if (this.locked && e.button === 0) this._attack = true;
+    });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
       if (overlay) overlay.classList.toggle('hidden', this.locked);
@@ -40,6 +47,13 @@ export class Input {
       e.preventDefault();
       this.distance = THREE.MathUtils.clamp(this.distance + e.deltaY * 0.01, MIN_DIST, MAX_DIST);
     }, { passive: false });
+  }
+
+  /** True once per attack press (click or J), then cleared. */
+  consumeAttack() {
+    const a = this._attack;
+    this._attack = false;
+    return a;
   }
 
   /** Jump is edge-triggered: true only on the frame Space goes down. */
