@@ -24,6 +24,27 @@ const DEF = {
   [B.WATER]: { top: C('#3f86c8'), side: C('#3f86c8'), bottom: C('#3f86c8') },
 };
 
+// Atlas tile indices (see textures.js) and which tile each block face uses.
+export const TILE = {
+  GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, SAND: 4,
+  WOOD_TOP: 5, WOOD_SIDE: 6, LEAVES: 7, PLANK: 8, COBBLE: 9, WATER: 10,
+};
+
+export function faceTile(type, cat) {
+  switch (type) {
+    case B.GRASS: return cat === 'top' ? TILE.GRASS_TOP : cat === 'bottom' ? TILE.DIRT : TILE.GRASS_SIDE;
+    case B.DIRT: return TILE.DIRT;
+    case B.STONE: return TILE.STONE;
+    case B.SAND: return TILE.SAND;
+    case B.WOOD: return cat === 'side' ? TILE.WOOD_SIDE : TILE.WOOD_TOP;
+    case B.LEAVES: return TILE.LEAVES;
+    case B.PLANK: return TILE.PLANK;
+    case B.COBBLE: return TILE.COBBLE;
+    case B.WATER: return TILE.WATER;
+    default: return TILE.STONE;
+  }
+}
+
 /** Solid = blocks the player and stops a ray (everything but air and water). */
 export const isSolid = (t) => t !== B.AIR && t !== B.WATER;
 /** Opaque = hides the neighbor face behind it (air and water are see-through). */

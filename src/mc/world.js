@@ -5,7 +5,8 @@
 // edit sits on a chunk border).
 
 import * as THREE from 'three';
-import { B, isOpaque, isSolid, faceColor } from './blocks.js';
+import { B, isOpaque, isSolid, faceTile } from './blocks.js';
+import { buildAtlas, COLS, ROWS } from './textures.js';
 
 export const SX = 64;
 export const SY = 40;
@@ -39,8 +40,11 @@ export class VoxelWorld {
   constructor() {
     this.data = new Uint8Array(SX * SY * SZ);
     this.group = new THREE.Group();
-    this.opaqueMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
-    this.waterMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.72, depthWrite: false });
+    const atlas = buildAtlas(); // procedural texture atlas (see textures.js)
+    // vertexColors carry the per-face directional shade; the atlas map supplies
+    // the texture — MeshBasic multiplies them (texture × shade).
+    this.opaqueMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.DoubleSide });
+    this.waterMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.78, depthWrite: false });
     this.meshes = {}; // key `${cx},${cz}` -> { opaque, water }
     this._generate();
   }
@@ -119,8 +123,8 @@ export class VoxelWorld {
     if (old) {
       for (const m of [old.opaque, old.water]) { if (m) { this.group.remove(m); m.geometry.dispose(); } }
     }
-    const op = { pos: [], col: [] };
-    const wa = { pos: [], col: [] };
+    const op = { pos: [], col: [], uv: [] };
+    const wa = { pos: [], col: [], uv: [] };
     const x0 = cx * CHUNK;
     const z0 = cz * CHUNK;
     for (let x = x0; x < x0 + CHUNK; x++) {
@@ -146,6 +150,7 @@ export class VoxelWorld {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(buf.pos, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(buf.col, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(buf.uv, 2));
       const m = new THREE.Mesh(g, mat);
       this.group.add(m);
       return m;
@@ -154,14 +159,18 @@ export class VoxelWorld {
   }
 
   _pushFace(buf, x, y, z, f, type) {
-    const [r, gr, b] = faceColor(type, f.cat);
-    const s = f.s;
-    const cr = r * s, cg = gr * s, cb = b * s;
-    const [a0, a1, a2, a3] = f.c;
-    const quad = [a0, a1, a2, a0, a2, a3]; // two triangles
-    for (const c of quad) {
-      buf.pos.push(x + c[0], y + c[1], z + c[2]);
-      buf.col.push(cr, cg, cb);
+    const s = f.s; // directional shade, applied as a grey vertex colour
+    const tile = faceTile(type, f.cat);
+    const c = tile % COLS, r = Math.floor(tile / COLS);
+    const u0 = c / COLS, v0 = 1 - (r + 1) / ROWS; // atlas rect (flipY texture)
+    const uw = 1 / COLS, vh = 1 / ROWS;
+    const uvC = [[0, 0], [0, 1], [1, 1], [1, 0]]; // per-corner tile UVs
+    const order = [0, 1, 2, 0, 2, 3]; // two triangles
+    for (const k of order) {
+      const corner = f.c[k];
+      buf.pos.push(x + corner[0], y + corner[1], z + corner[2]);
+      buf.col.push(s, s, s);
+      buf.uv.push(u0 + uvC[k][0] * uw, v0 + uvC[k][1] * vh);
     }
   }
 

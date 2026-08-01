@@ -15,13 +15,12 @@
       #scene { display: block; width: 100vw; height: 100vh; }
       #crosshair {
         position: fixed; left: 50%; top: 50%; z-index: 4; transform: translate(-50%, -50%);
-        width: 20px; height: 20px; pointer-events: none;
+        width: 26px; height: 26px; pointer-events: none; mix-blend-mode: difference;
       }
-      #crosshair::before, #crosshair::after {
-        content: ''; position: absolute; background: rgba(255,255,255,.85); box-shadow: 0 0 2px rgba(0,0,0,.6);
-      }
-      #crosshair::before { left: 9px; top: 2px; width: 2px; height: 16px; }
-      #crosshair::after { top: 9px; left: 2px; height: 2px; width: 16px; }
+      /* White lines under "difference" invert against whatever's behind them. */
+      #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; }
+      #crosshair::before { left: 11px; top: 0; width: 4px; height: 26px; }
+      #crosshair::after { top: 11px; left: 0; height: 4px; width: 26px; }
       #fps { position: fixed; right: 14px; top: 12px; z-index: 5; font: 600 13px system-ui; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
       #back {
         position: fixed; left: 14px; top: 12px; z-index: 6;
