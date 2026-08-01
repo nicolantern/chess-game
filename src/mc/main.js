@@ -8,6 +8,7 @@ import { VoxelWorld } from './world.js';
 import { Player } from './player.js';
 import { raycast } from './raycast.js';
 import { Particles } from './particles.js';
+import { initAudio, sfxDig, sfxPlace } from './sound.js';
 import { B, HOTBAR, NAMES, swatchCss, breakTime } from './blocks.js';
 
 const canvas = document.getElementById('scene');
@@ -80,7 +81,7 @@ addEventListener('keyup', (e) => keys.delete(e.code));
 // Clicking the canvas OR the "Click to play" overlay (which sits on top of it)
 // captures the mouse. Without the overlay handler the overlay would eat the
 // first click and pointer lock would never engage.
-const lock = () => { if (!locked) canvas.requestPointerLock(); };
+const lock = () => { initAudio(); if (!locked) canvas.requestPointerLock(); };
 canvas.addEventListener('click', lock);
 overlay.addEventListener('click', lock);
 document.addEventListener('pointerlockchange', () => {
@@ -101,7 +102,7 @@ addEventListener('mousedown', (e) => {
     const bt = HOTBAR[sel];
     if ((inv[bt] || 0) <= 0) return; // nothing of that block to place
     const tx = hit.x + hit.nx, ty = hit.y + hit.ny, tz = hit.z + hit.nz;
-    if (!placeHitsPlayer(tx, ty, tz)) { world.edit(tx, ty, tz, bt); inv[bt]--; buildHotbar(); } // place → spend one
+    if (!placeHitsPlayer(tx, ty, tz)) { world.edit(tx, ty, tz, bt); inv[bt]--; buildHotbar(); sfxPlace(bt); } // place → spend one
   }
 });
 addEventListener('mouseup', (e) => { if (e.button === 0) mining = false; });
@@ -128,6 +129,7 @@ const dirVec = new THREE.Vector3();
 let currentHit = null;
 let mineKey = null; // "x,y,z" of the block currently being mined
 let mineProgress = 0; // seconds held on that block
+let digTickT = 0; // time since the last mining "dig" sound
 let last = performance.now();
 let fpsAccum = 0, fpsFrames = 0;
 
@@ -154,6 +156,9 @@ function frame(now) {
     const t = world.get(currentHit.x, currentHit.y, currentHit.z);
     const need = breakTime(t);
     mineProgress += dt;
+    // Repeating dig sound while chipping away.
+    digTickT += dt;
+    if (digTickT >= 0.2) { digTickT = 0; sfxDig(t, false); }
     crack.visible = true;
     crack.position.set(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5);
     crack.material.opacity = 0.12 + 0.5 * Math.min(1, mineProgress / need);
@@ -161,6 +166,7 @@ function frame(now) {
       world.edit(currentHit.x, currentHit.y, currentHit.z, B.AIR);
       if (t in inv) { inv[t]++; buildHotbar(); }
       particles.burst(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5, t);
+      sfxDig(t, true); // block broke
       mineProgress = 0;
       mineKey = null;
     }
@@ -168,6 +174,7 @@ function frame(now) {
     crack.visible = false;
     mineKey = null;
     mineProgress = 0;
+    digTickT = 0.2; // so the first dig sound plays immediately on next mine
   }
 
   particles.update(dt);
