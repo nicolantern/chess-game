@@ -29,7 +29,10 @@ export class Input {
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
 
-    canvas.addEventListener('click', () => canvas.requestPointerLock());
+    // Clicking the canvas or the overlay on top of it captures the mouse.
+    const lock = () => { if (!this.locked) canvas.requestPointerLock(); };
+    canvas.addEventListener('click', lock);
+    if (overlay) overlay.addEventListener('click', lock);
     // Left mouse button swings the sword while the mouse is captured.
     document.addEventListener('mousedown', (e) => {
       if (this.locked && e.button === 0) this._attack = true;

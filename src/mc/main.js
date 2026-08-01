@@ -62,7 +62,12 @@ addEventListener('keydown', (e) => {
   if (m) setSel(+m[1] - 1);
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
-canvas.addEventListener('click', () => canvas.requestPointerLock());
+// Clicking the canvas OR the "Click to play" overlay (which sits on top of it)
+// captures the mouse. Without the overlay handler the overlay would eat the
+// first click and pointer lock would never engage.
+const lock = () => { if (!locked) canvas.requestPointerLock(); };
+canvas.addEventListener('click', lock);
+overlay.addEventListener('click', lock);
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
   overlay.classList.toggle('hidden', locked);
