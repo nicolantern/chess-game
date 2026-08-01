@@ -7,7 +7,8 @@ import * as THREE from 'three';
 import { VoxelWorld } from './world.js';
 import { Player } from './player.js';
 import { raycast } from './raycast.js';
-import { B, HOTBAR, NAMES, swatchCss } from './blocks.js';
+import { Particles } from './particles.js';
+import { B, HOTBAR, NAMES, swatchCss, breakTime } from './blocks.js';
 
 const canvas = document.getElementById('scene');
 const fpsEl = document.getElementById('fps');
@@ -27,6 +28,7 @@ const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 1
 const world = new VoxelWorld();
 world.build(scene);
 const player = new Player(world, camera);
+const particles = new Particles(scene);
 
 // Wireframe box that hugs the targeted block.
 const highlight = new THREE.LineSegments(
@@ -35,6 +37,15 @@ const highlight = new THREE.LineSegments(
 );
 highlight.visible = false;
 scene.add(highlight);
+
+// Darkening "cracks" cube shown over the block you're mining; opacity tracks
+// how far along the break is.
+const crack = new THREE.Mesh(
+  new THREE.BoxGeometry(1.01, 1.01, 1.01),
+  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false }),
+);
+crack.visible = false;
+scene.add(crack);
 
 // --- Hotbar + inventory ---------------------------------------------------
 // You start empty and collect blocks by mining them; placing spends one.
@@ -79,21 +90,22 @@ document.addEventListener('pointerlockchange', () => {
 document.addEventListener('mousemove', (e) => { if (locked) player.look(e.movementX, e.movementY); });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('wheel', (e) => { if (locked) setSel(sel + (e.deltaY > 0 ? 1 : -1)); }, { passive: true });
+let mining = false; // holding left mouse
 addEventListener('mousedown', (e) => {
   if (!locked) return;
-  const hit = currentHit;
-  if (!hit) return;
   if (e.button === 0) {
-    const t = world.get(hit.x, hit.y, hit.z); // mine → collect the block
-    world.edit(hit.x, hit.y, hit.z, B.AIR);
-    if (t in inv) { inv[t]++; buildHotbar(); }
+    mining = true; // start/continue timed mining in the loop
   } else if (e.button === 2) {
+    const hit = currentHit;
+    if (!hit) return;
     const bt = HOTBAR[sel];
     if ((inv[bt] || 0) <= 0) return; // nothing of that block to place
     const tx = hit.x + hit.nx, ty = hit.y + hit.ny, tz = hit.z + hit.nz;
     if (!placeHitsPlayer(tx, ty, tz)) { world.edit(tx, ty, tz, bt); inv[bt]--; buildHotbar(); } // place → spend one
   }
 });
+addEventListener('mouseup', (e) => { if (e.button === 0) mining = false; });
+document.addEventListener('pointerlockchange', () => { if (!locked) mining = false; });
 
 // Don't let a placed block spawn inside the player's body.
 function placeHitsPlayer(tx, ty, tz) {
@@ -114,6 +126,8 @@ addEventListener('resize', () => {
 // --- Loop -----------------------------------------------------------------
 const dirVec = new THREE.Vector3();
 let currentHit = null;
+let mineKey = null; // "x,y,z" of the block currently being mined
+let mineProgress = 0; // seconds held on that block
 let last = performance.now();
 let fpsAccum = 0, fpsFrames = 0;
 
@@ -132,6 +146,31 @@ function frame(now) {
     highlight.visible = false;
   }
 
+  // Hold-to-mine: accumulate time on the targeted block until it breaks. Looking
+  // away (target changes) or releasing resets progress.
+  if (mining && currentHit) {
+    const key = `${currentHit.x},${currentHit.y},${currentHit.z}`;
+    if (key !== mineKey) { mineKey = key; mineProgress = 0; }
+    const t = world.get(currentHit.x, currentHit.y, currentHit.z);
+    const need = breakTime(t);
+    mineProgress += dt;
+    crack.visible = true;
+    crack.position.set(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5);
+    crack.material.opacity = 0.12 + 0.5 * Math.min(1, mineProgress / need);
+    if (mineProgress >= need) {
+      world.edit(currentHit.x, currentHit.y, currentHit.z, B.AIR);
+      if (t in inv) { inv[t]++; buildHotbar(); }
+      particles.burst(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5, t);
+      mineProgress = 0;
+      mineKey = null;
+    }
+  } else {
+    crack.visible = false;
+    mineKey = null;
+    mineProgress = 0;
+  }
+
+  particles.update(dt);
   renderer.render(scene, camera);
 
   fpsAccum += dt; fpsFrames++;

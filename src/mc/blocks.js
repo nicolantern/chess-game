@@ -45,6 +45,13 @@ export function faceTile(type, cat) {
   }
 }
 
+// Seconds of holding left-click to break each block.
+export const BREAK_TIME = {
+  [B.GRASS]: 0.75, [B.DIRT]: 0.75, [B.SAND]: 0.6, [B.LEAVES]: 0.3,
+  [B.STONE]: 2.5, [B.COBBLE]: 3, [B.WOOD]: 3, [B.PLANK]: 2.5,
+};
+export const breakTime = (t) => BREAK_TIME[t] ?? 1;
+
 /** Solid = blocks the player and stops a ray (everything but air and water). */
 export const isSolid = (t) => t !== B.AIR && t !== B.WATER;
 /** Opaque = hides the neighbor face behind it (air and water are see-through). */
