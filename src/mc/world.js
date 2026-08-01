@@ -5,7 +5,7 @@
 // edit sits on a chunk border).
 
 import * as THREE from 'three';
-import { B, isOpaque, isSolid, faceTile } from './blocks.js';
+import { B, isOpaque, isSolid, isGravity, faceTile } from './blocks.js';
 import { buildAtlas, COLS, ROWS } from './textures.js';
 
 export const SX = 64;
@@ -45,6 +45,9 @@ export class VoxelWorld {
     // the texture — MeshBasic multiplies them (texture × shade).
     this.opaqueMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.DoubleSide });
     this.waterMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.78, depthWrite: false });
+    // Glass: alphaTest discards the clear centre so you see through it, keeping
+    // the frame; a distinct pass so it doesn't cull neighbours like opaque blocks.
+    this.glassMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.DoubleSide, transparent: true, alphaTest: 0.3 });
     this.meshes = {}; // key `${cx},${cz}` -> { opaque, water }
     this._generate();
   }
@@ -79,9 +82,18 @@ export class VoxelWorld {
         const h = this._height(x, z);
         for (let y = 0; y <= h; y++) {
           let t;
-          if (y < h - 3) t = B.STONE;
-          else if (y < h) t = B.DIRT;
-          else t = h < SEA + 1 ? B.SAND : B.GRASS; // beaches near water
+          if (y < h - 3) {
+            // Stone, occasionally with an ore vein (iron deeper, coal higher).
+            t = B.STONE;
+            const r = rng();
+            if (r < 0.012 && y < SEA - 4) t = B.IRON_ORE;
+            else if (r < 0.03) t = B.COAL_ORE;
+            else if (r < 0.045) t = B.GRAVEL;
+          } else if (y < h) {
+            t = B.DIRT;
+          } else {
+            t = h < SEA + 1 ? B.SAND : h > SEA + 7 ? B.SNOW : B.GRASS; // beaches; snow caps
+          }
           this._set(x, y, z, t);
         }
         for (let y = h + 1; y <= SEA; y++) this._set(x, y, z, B.WATER); // fill oceans
@@ -121,10 +133,11 @@ export class VoxelWorld {
     const key = `${cx},${cz}`;
     const old = this.meshes[key];
     if (old) {
-      for (const m of [old.opaque, old.water]) { if (m) { this.group.remove(m); m.geometry.dispose(); } }
+      for (const m of [old.opaque, old.water, old.glass]) { if (m) { this.group.remove(m); m.geometry.dispose(); } }
     }
     const op = { pos: [], col: [], uv: [] };
     const wa = { pos: [], col: [], uv: [] };
+    const gl = { pos: [], col: [], uv: [] };
     const x0 = cx * CHUNK;
     const z0 = cz * CHUNK;
     for (let x = x0; x < x0 + CHUNK; x++) {
@@ -133,14 +146,17 @@ export class VoxelWorld {
           const t = this.get(x, y, z);
           if (t === B.AIR) continue;
           const isWater = t === B.WATER;
+          const glass = t === B.GLASS;
           for (const f of DIRS) {
             const n = this.get(x + f.d[0], y + f.d[1], z + f.d[2]);
             if (isWater) {
               if (n !== B.AIR) continue; // only water surfaces touching air
+            } else if (glass) {
+              if (isOpaque(n) || n === B.GLASS) continue; // hide behind opaque + adjacent glass
             } else if (isOpaque(n)) {
-              continue; // hidden face
+              continue; // hidden opaque face
             }
-            this._pushFace(isWater ? wa : op, x, y, z, f, t);
+            this._pushFace(isWater ? wa : glass ? gl : op, x, y, z, f, t);
           }
         }
       }
@@ -155,7 +171,7 @@ export class VoxelWorld {
       this.group.add(m);
       return m;
     };
-    this.meshes[key] = { opaque: mk(op, this.opaqueMat), water: mk(wa, this.waterMat) };
+    this.meshes[key] = { opaque: mk(op, this.opaqueMat), water: mk(wa, this.waterMat), glass: mk(gl, this.glassMat) };
   }
 
   _pushFace(buf, x, y, z, f, type) {
@@ -174,10 +190,7 @@ export class VoxelWorld {
     }
   }
 
-  /** Place/remove a block and rebuild the affected chunk(s). */
-  edit(x, y, z, t) {
-    if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
-    this._set(x, y, z, t);
+  _rebuildAround(x, z) {
     const cx = Math.floor(x / CHUNK);
     const cz = Math.floor(z / CHUNK);
     this._rebuild(cx, cz);
@@ -186,6 +199,33 @@ export class VoxelWorld {
     if (lx === CHUNK - 1 && cx < CX - 1) this._rebuild(cx + 1, cz);
     if (lz === 0 && cz > 0) this._rebuild(cx, cz - 1);
     if (lz === CHUNK - 1 && cz < CZ - 1) this._rebuild(cx, cz + 1);
+  }
+
+  /** Place/remove a block, settle any gravity blocks, and rebuild chunk(s). */
+  edit(x, y, z, t) {
+    if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
+    this._set(x, y, z, t);
+    this._settle(x, z); // sand/gravel above may now fall
+    this._rebuildAround(x, z);
+  }
+
+  // Let gravity blocks in a column fall into air/water below them. Runs bottom
+  // -up so a whole sand stack settles in one pass.
+  _settle(x, z) {
+    for (let y = 1; y < SY; y++) {
+      if (!isGravity(this.get(x, y, z))) continue;
+      let ny = y;
+      while (ny > 0) {
+        const below = this.get(x, ny - 1, z);
+        if (below === B.AIR || below === B.WATER) ny--;
+        else break;
+      }
+      if (ny !== y) {
+        const g = this.get(x, y, z);
+        this._set(x, y, z, B.AIR);
+        this._set(x, ny, z, g);
+      }
+    }
   }
 
   /** Ground height (first air above the surface) at a column, for spawning. */

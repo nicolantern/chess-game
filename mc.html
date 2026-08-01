@@ -39,6 +39,30 @@
       .slot .key { position: absolute; left: 3px; top: 0; font: 700 10px system-ui; color: #fff; opacity: .65; text-shadow: 0 1px 2px #000; }
       .slot .count { position: absolute; right: 3px; bottom: 0; font: 800 15px system-ui; color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
       .slot.empty .count { color: #cfcfcf; }
+
+      /* Survival stats: health + hunger rows over an XP bar, above the hotbar. */
+      #stats { position: fixed; left: 50%; bottom: 66px; transform: translateX(-50%); width: 372px; z-index: 5; }
+      #stats .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+      #health, #hunger { display: flex; gap: 1px; }
+      #hunger { flex-direction: row-reverse; }
+      .hp, .fd { font-size: 16px; line-height: 1; text-shadow: 0 1px 2px #000; }
+      .hp.full { color: #ff3b4e; }
+      .hp.empty { color: #571d23; }
+      .hp.half { background: linear-gradient(90deg, #ff3b4e 50%, #571d23 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .fd.empty { filter: grayscale(1) brightness(.55); opacity: .6; }
+      #xp { position: relative; height: 9px; background: #2b2b2b; border: 1px solid #000; border-radius: 2px; }
+      #xpfill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(#9bf05a, #5fce2f); border-radius: 2px; }
+      #xplevel { position: absolute; left: 50%; top: -17px; transform: translateX(-50%); color: #8ef04a; font: 800 14px system-ui; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
+
+      /* Inventory GUI */
+      #inv { position: fixed; inset: 0; z-index: 12; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+      #inv.show { display: flex; }
+      .inv-panel { background: #c6c6c6; border: 4px solid #565656; border-radius: 6px; padding: 14px 14px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+      .inv-title { font: 700 14px system-ui; color: #3a3a3a; margin-bottom: 10px; }
+      .inv-main, .inv-hot { display: grid; grid-template-columns: repeat(9, 42px); gap: 4px; }
+      .inv-hot { margin-top: 12px; }
+      .inv-panel .slot { width: 42px; height: 42px; border: 2px solid #8a8a8a; background: #8b8b8b; border-radius: 3px; box-shadow: inset 2px 2px 0 rgba(255,255,255,.25), inset -2px -2px 0 rgba(0,0,0,.2); }
+      .inv-panel .slot.on { outline: 2px solid #ffe27a; }
       #overlay {
         position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
         background: rgba(10,20,30,.35); cursor: pointer; font: 600 20px system-ui; color: #fff;
@@ -54,10 +78,21 @@
     <div id="fps">–– fps</div>
     <div id="crosshair"></div>
     <div id="hud">
-      <b>WASD</b> move · <b>Mouse</b> look · <b>Space</b> jump · <b>Shift</b> sprint · <b>Hold L-click</b> mine · <b>R-click</b> place · <b>1–8 / scroll</b> block · <b>Esc</b> release
+      <b>WASD</b> move · <b>Mouse</b> look · <b>Space</b> jump · <b>Shift</b> sprint · <b>Hold L-click</b> mine · <b>R-click</b> place · <b>1–9 / scroll</b> select · <b>E</b> inventory · <b>Esc</b> release
+    </div>
+    <div id="stats">
+      <div class="row"><div id="health"></div><div id="hunger"></div></div>
+      <div id="xp"><div id="xpfill"></div><div id="xplevel"></div></div>
     </div>
     <div id="hotbar"></div>
-    <div id="overlay">Click to play<small>WASD move · mouse look · left-click mine · right-click place</small></div>
+    <div id="inv">
+      <div class="inv-panel">
+        <div class="inv-title">Inventory</div>
+        <div class="inv-main"></div>
+        <div class="inv-hot"></div>
+      </div>
+    </div>
+    <div id="overlay">Click to play<small>WASD move · mouse look · left-click mine · right-click place · E for inventory</small></div>
     <script type="module" src="/src/mc/main.js"></script>
   </body>
 </html>

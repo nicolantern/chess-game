@@ -93,6 +93,33 @@ export function buildAtlas() {
 
   fill(TILE.WATER, 63, 134, 200, 12);
 
+  // Gravel: noisy grey-brown with darker pebbles.
+  {
+    const [ox, oy] = fill(TILE.GRAVEL, 150, 142, 132, 16);
+    for (let i = 0; i < 16; i++) set(ox, oy, (Math.random() * PX) | 0, (Math.random() * PX) | 0, 108, 102, 94);
+  }
+  // Coal ore: stone with black flecks.
+  {
+    const [ox, oy] = fill(TILE.COAL_ORE, 140, 140, 140, 12);
+    for (let i = 0; i < 12; i++) { const x = (Math.random() * PX) | 0, y = (Math.random() * PX) | 0; set(ox, oy, x, y, 30, 30, 30); if (Math.random() < 0.5) set(ox, oy, (x + 1) % PX, y, 26, 26, 26); }
+  }
+  // Iron ore: stone with tan flecks.
+  {
+    const [ox, oy] = fill(TILE.IRON_ORE, 140, 140, 140, 12);
+    for (let i = 0; i < 12; i++) { const x = (Math.random() * PX) | 0, y = (Math.random() * PX) | 0; set(ox, oy, x, y, 205, 160, 120); if (Math.random() < 0.5) set(ox, oy, x, (y + 1) % PX, 190, 148, 108); }
+  }
+  fill(TILE.SNOW, 236, 242, 248, 8);
+
+  // Glass: clear centre (alphaTest discards it) with a light frame + shine.
+  {
+    const [ox, oy] = org(TILE.GLASS);
+    ctx.clearRect(ox, oy, PX, PX);
+    ctx.fillStyle = 'rgba(214,240,250,0.6)';
+    for (let i = 0; i < PX; i++) { ctx.fillRect(ox + i, oy, 1, 1); ctx.fillRect(ox + i, oy + PX - 1, 1, 1); ctx.fillRect(ox, oy + i, 1, 1); ctx.fillRect(ox + PX - 1, oy + i, 1, 1); }
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    for (let i = 2; i < 8; i++) ctx.fillRect(ox + i, oy + i, 1, 1);
+  }
+
   const tex = new THREE.CanvasTexture(cv);
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;

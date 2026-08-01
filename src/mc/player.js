@@ -23,9 +23,22 @@ export class Player {
     this.pitch = -0.2;
     this.vy = 0;
     this.onGround = false;
+    this.wasOnGround = true;
+    this.apexY = 0; // highest point since leaving the ground
+    this.landedFall = 0; // blocks fallen on the frame we land (0 otherwise)
     const cx = Math.floor(SX / 2) + 0.5;
     const cz = Math.floor(SZ / 2) + 0.5;
     this.pos = new THREE.Vector3(cx, world.surfaceY(Math.floor(cx), Math.floor(cz)) + 0.5, cz);
+    this._syncCamera();
+  }
+
+  respawn() {
+    const cx = Math.floor(SX / 2) + 0.5;
+    const cz = Math.floor(SZ / 2) + 0.5;
+    this.pos.set(cx, this.world.surfaceY(Math.floor(cx), Math.floor(cz)) + 0.5, cz);
+    this.vy = 0;
+    this.apexY = this.pos.y;
+    this.wasOnGround = true;
     this._syncCamera();
   }
 
@@ -77,7 +90,18 @@ export class Player {
     if (this.pos.y < -5) {
       this.pos.y = this.world.surfaceY(Math.floor(this.pos.x), Math.floor(this.pos.z)) + 0.5;
       this.vy = 0;
+      this.apexY = this.pos.y;
     }
+
+    // Track fall distance; report it on the frame we land so main can apply damage.
+    if (this.onGround) {
+      this.landedFall = !this.wasOnGround ? Math.max(0, this.apexY - this.pos.y) : 0;
+      this.apexY = this.pos.y;
+    } else {
+      this.landedFall = 0;
+      if (this.pos.y > this.apexY) this.apexY = this.pos.y;
+    }
+    this.wasOnGround = this.onGround;
 
     this._syncCamera();
   }
