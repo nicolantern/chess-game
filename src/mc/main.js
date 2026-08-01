@@ -36,16 +36,20 @@ const highlight = new THREE.LineSegments(
 highlight.visible = false;
 scene.add(highlight);
 
-// --- Hotbar ---------------------------------------------------------------
+// --- Hotbar + inventory ---------------------------------------------------
+// You start empty and collect blocks by mining them; placing spends one.
 let sel = 0;
+const inv = {};
+HOTBAR.forEach((t) => { inv[t] = 0; });
+
 function buildHotbar() {
   hotbarEl.innerHTML = '';
   HOTBAR.forEach((t, i) => {
     const slot = document.createElement('div');
-    slot.className = 'slot' + (i === sel ? ' on' : '');
+    slot.className = 'slot' + (i === sel ? ' on' : '') + (inv[t] > 0 ? '' : ' empty');
     slot.style.background = swatchCss(t);
     slot.title = NAMES[t];
-    slot.innerHTML = `<span>${i + 1}</span>`;
+    slot.innerHTML = `<span class="key">${i + 1}</span><span class="count">${inv[t]}</span>`;
     hotbarEl.appendChild(slot);
   });
 }
@@ -80,10 +84,14 @@ addEventListener('mousedown', (e) => {
   const hit = currentHit;
   if (!hit) return;
   if (e.button === 0) {
-    world.edit(hit.x, hit.y, hit.z, B.AIR); // mine
+    const t = world.get(hit.x, hit.y, hit.z); // mine → collect the block
+    world.edit(hit.x, hit.y, hit.z, B.AIR);
+    if (t in inv) { inv[t]++; buildHotbar(); }
   } else if (e.button === 2) {
+    const bt = HOTBAR[sel];
+    if ((inv[bt] || 0) <= 0) return; // nothing of that block to place
     const tx = hit.x + hit.nx, ty = hit.y + hit.ny, tz = hit.z + hit.nz;
-    if (!placeHitsPlayer(tx, ty, tz)) world.edit(tx, ty, tz, HOTBAR[sel]); // place
+    if (!placeHitsPlayer(tx, ty, tz)) { world.edit(tx, ty, tz, bt); inv[bt]--; buildHotbar(); } // place → spend one
   }
 });
 
