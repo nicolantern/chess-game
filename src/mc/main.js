@@ -56,19 +56,36 @@ let xp = 0; // points into the current level
 const xpNeed = () => 5 + level * 3;
 let regenT = 0, starveT = 0;
 
+let dead = false;
+
 function hurt(dmg) {
-  if (dmg <= 0) return;
+  if (dmg <= 0 || dead) return;
   health = Math.max(0, health - dmg);
   drawHealth();
   sfxMob('hurt');
   const f = $('hurtflash');
   if (f) { f.style.opacity = '0.5'; setTimeout(() => { f.style.opacity = '0'; }, 120); }
-  if (health <= 0) {
-    player.respawn();
-    health = 20; hunger = 20;
-    drawHealth(); drawHunger();
-  }
+  if (health <= 0) die();
 }
+
+function die() {
+  dead = true;
+  mining = false;
+  document.exitPointerLock();
+  sfxMob('boom');
+  $('death-sub').textContent = `You reached level ${level}.`;
+  $('killscreen').classList.add('show');
+}
+
+function respawn() {
+  dead = false;
+  player.respawn();
+  mobs.clear();
+  health = 20; hunger = 20; regenT = 0; starveT = 0;
+  refreshHud();
+  $('killscreen').classList.remove('show');
+}
+$('respawn').addEventListener('click', respawn);
 function gainXp(n) {
   xp += n;
   while (xp >= xpNeed()) { xp -= xpNeed(); level++; }
@@ -147,12 +164,12 @@ const NONE = new Set();
 let locked = false;
 let mining = false;
 
-const lock = () => { initAudio(); if (!locked && !invOpen) canvas.requestPointerLock(); };
+const lock = () => { initAudio(); if (!locked && !invOpen && !dead) canvas.requestPointerLock(); };
 canvas.addEventListener('click', lock);
 overlay.addEventListener('click', lock);
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  overlay.classList.toggle('hidden', locked || invOpen);
+  overlay.classList.toggle('hidden', locked || invOpen || dead);
   if (!locked) mining = false;
 });
 document.addEventListener('mousemove', (e) => { if (locked) player.look(e.movementX, e.movementY); });
@@ -217,7 +234,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
-  player.update(dt, invOpen ? NONE : keys);
+  player.update(dt, (invOpen || dead) ? NONE : keys);
   dayNight.update(dt);
   mobs.update(dt, {
     playerPos: player.pos,

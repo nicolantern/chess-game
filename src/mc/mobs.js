@@ -15,6 +15,51 @@ const MAX_MOBS = 14;
 const mat = (color) => new THREE.MeshBasicMaterial({ color });
 const box = (w, h, d, color) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
 
+// Shared face materials.
+const FBLACK = mat('#161616');
+const FWHITE = mat('#efe9df');
+const FPINK = mat('#df9a9a');
+const FRED = mat('#c23a3a');
+
+// Thin plate stuck on a head face (front is +Z).
+function plate(head, w, h, material, x, y, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.02), material);
+  m.position.set(x, y, z);
+  head.add(m);
+}
+
+// Add eyes/mouth to a head, keyed by mob kind. `hs` is the head edge length.
+function faceOn(head, hs, kind) {
+  const f = hs / 2 + 0.012; // just proud of the front face
+  if (kind === 'creeper') {
+    plate(head, 0.17, 0.17, FBLACK, -0.15, 0.1, f);
+    plate(head, 0.17, 0.17, FBLACK, 0.15, 0.1, f);
+    plate(head, 0.14, 0.3, FBLACK, 0, -0.06, f);
+    plate(head, 0.13, 0.13, FBLACK, -0.13, -0.24, f);
+    plate(head, 0.13, 0.13, FBLACK, 0.13, -0.24, f);
+  } else if (kind === 'skeleton') {
+    plate(head, 0.14, 0.14, FBLACK, -0.13, 0.05, f);
+    plate(head, 0.14, 0.14, FBLACK, 0.13, 0.05, f);
+    plate(head, 0.3, 0.05, FBLACK, 0, -0.17, f);
+  } else if (kind === 'zombie') {
+    plate(head, 0.13, 0.11, FBLACK, -0.13, 0.06, f);
+    plate(head, 0.13, 0.11, FBLACK, 0.13, 0.06, f);
+    plate(head, 0.07, 0.07, FRED, -0.13, 0.06, f + 0.006); // sunken red glint
+    plate(head, 0.07, 0.07, FRED, 0.13, 0.06, f + 0.006);
+    plate(head, 0.26, 0.05, FBLACK, 0, -0.15, f);
+  } else { // cow
+    plate(head, 0.12, 0.12, FWHITE, -0.15, 0.08, f);
+    plate(head, 0.12, 0.12, FWHITE, 0.15, 0.08, f);
+    plate(head, 0.06, 0.06, FBLACK, -0.15, 0.08, f + 0.006);
+    plate(head, 0.06, 0.06, FBLACK, 0.15, 0.08, f + 0.006);
+    plate(head, 0.32, 0.18, FPINK, 0, -0.14, f);
+    plate(head, 0.05, 0.05, FBLACK, -0.07, -0.14, f + 0.006);
+    plate(head, 0.05, 0.05, FBLACK, 0.07, -0.14, f + 0.006);
+    const horn = (sx) => { const h = box(0.1, 0.12, 0.1, '#e8e2d2'); h.position.set(0.16 * sx, hs / 2 + 0.02, -0.02); head.add(h); };
+    horn(-1); horn(1);
+  }
+}
+
 // Height of the first air block above the surface at a column.
 function groundTop(world, x, z) {
   const ix = Math.floor(x), iz = Math.floor(z);
@@ -25,10 +70,10 @@ function groundTop(world, x, z) {
 // --- Mob type definitions -------------------------------------------------
 // shape 'quad' (cow) or 'biped' (humanoids). behavior handled per `hostile`.
 const TYPES = {
-  cow: { hostile: false, hp: 8, speed: 1.6, shape: 'quad', body: '#6a4a34', head: '#e9e2d6', bw: 0.7, bh: 0.7, bl: 1.1, hs: 0.5, legLen: 0.7, xp: 2 },
-  zombie: { hostile: true, kind: 'melee', hp: 10, speed: 2.6, shape: 'biped', body: '#3f7a4a', head: '#5a8a5a', legcol: '#3a4a7a', xp: 3, dmg: 3, reach: 1.35 },
-  skeleton: { hostile: true, kind: 'ranged', hp: 8, speed: 2.4, shape: 'biped', body: '#d8d8d0', head: '#e6e6de', legcol: '#c9c9c1', xp: 3, range: 13, dmg: 2 },
-  creeper: { hostile: true, kind: 'boom', hp: 8, speed: 2.7, shape: 'creeper', body: '#4fa64f', head: '#57b257', xp: 4 },
+  cow: { hostile: false, hp: 8, speed: 1.6, shape: 'quad', face: 'cow', body: '#6a4a34', head: '#e9e2d6', bw: 0.7, bh: 0.7, bl: 1.1, hs: 0.5, legLen: 0.7, xp: 2 },
+  zombie: { hostile: true, kind: 'melee', hp: 10, speed: 2.6, shape: 'biped', face: 'zombie', body: '#3f7a4a', head: '#5a8a5a', legcol: '#3a4a7a', xp: 3, dmg: 3, reach: 1.35 },
+  skeleton: { hostile: true, kind: 'ranged', hp: 8, speed: 2.4, shape: 'biped', face: 'skeleton', body: '#d8d8d0', head: '#e6e6de', legcol: '#c9c9c1', xp: 3, range: 13, dmg: 2 },
+  creeper: { hostile: true, kind: 'boom', hp: 8, speed: 2.7, shape: 'creeper', face: 'creeper', body: '#4fa64f', head: '#57b257', xp: 4 },
 };
 
 function buildMesh(cfg) {
@@ -40,6 +85,7 @@ function buildMesh(cfg) {
     const head = box(cfg.hs, cfg.hs, cfg.hs, cfg.head);
     head.position.set(0, cfg.legLen + cfg.bh * 0.7, cfg.bl / 2 + cfg.hs / 2);
     g.add(body, head);
+    faceOn(head, cfg.hs, cfg.face);
     const lx = cfg.bw / 2 - 0.12, lz = cfg.bl / 2 - 0.14;
     for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
       const p = new THREE.Group();
@@ -56,6 +102,7 @@ function buildMesh(cfg) {
     const head = box(0.52, 0.52, 0.52, cfg.head);
     head.position.y = 0.3 + 1.1 + 0.26;
     g.add(body, head);
+    faceOn(head, 0.52, 'creeper');
     for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
       const p = new THREE.Group();
       p.position.set(0.16 * sx, 0.3, 0.14 * sz);
@@ -71,6 +118,7 @@ function buildMesh(cfg) {
     const head = box(0.5, 0.5, 0.5, cfg.head);
     head.position.y = 0.7 + 0.7 + 0.25;
     g.add(body, head);
+    faceOn(head, 0.5, cfg.face);
     for (const sx of [-1, 1]) {
       const p = new THREE.Group();
       p.position.set(0.14 * sx, 0.7, 0);
@@ -210,6 +258,15 @@ export class Mobs {
     const m = new Mob(type, x, z, this.world);
     this.list.push(m);
     this.scene.add(m.mesh);
+  }
+
+  /** Remove all mobs, arrows, and orbs (e.g. on respawn). */
+  clear() {
+    for (const m of this.list) this.scene.remove(m.mesh);
+    for (const a of this.arrows) this.scene.remove(a.mesh);
+    for (const o of this.orbs) this.scene.remove(o.mesh);
+    this.list = []; this.arrows = []; this.orbs = [];
+    this.spawnT = 6;
   }
 
   /** Spawn a specific mob at explicit coords (used by tests/spawn eggs). */
