@@ -57,9 +57,18 @@ const xpNeed = () => 5 + level * 3;
 let regenT = 0, starveT = 0;
 
 let dead = false;
+let lastCause = '';
+const DEATH_MSG = {
+  zombie: 'You were slain by a Zombie',
+  skeleton: 'You were shot by a Skeleton',
+  creeper: 'You were blown up by a Creeper',
+  fall: 'You fell from a high place',
+  starve: 'You starved to death',
+};
 
-function hurt(dmg) {
+function hurt(dmg, cause) {
   if (dmg <= 0 || dead) return;
+  if (cause) lastCause = cause;
   health = Math.max(0, health - dmg);
   drawHealth();
   sfxMob('hurt');
@@ -73,7 +82,8 @@ function die() {
   mining = false;
   document.exitPointerLock();
   sfxMob('boom');
-  $('death-sub').textContent = `You reached level ${level}.`;
+  const msg = DEATH_MSG[lastCause] || 'You died';
+  $('death-sub').innerHTML = `${msg}<br><span class="death-lvl">Level ${level}</span>`;
   $('killscreen').classList.add('show');
 }
 
@@ -245,14 +255,14 @@ function frame(now) {
   });
 
   // Fall damage: >3 blocks fallen hurts for (fall − 3).
-  if (player.landedFall > 3) hurt(Math.floor(player.landedFall - 3));
+  if (player.landedFall > 3) hurt(Math.floor(player.landedFall - 3), 'fall');
 
   // Hunger drains (faster sprinting); high hunger regenerates health, empty
   // hunger starves.
   const sprinting = (keys.has('ShiftLeft') || keys.has('ShiftRight')) && (keys.has('KeyW') || keys.has('KeyA') || keys.has('KeyS') || keys.has('KeyD'));
   if (!invOpen) hunger = Math.max(0, hunger - dt * (sprinting ? 0.25 : 0.11));
   if (hunger >= 18 && health < 20) { regenT += dt; if (regenT > 3) { regenT = 0; health = Math.min(20, health + 1); drawHealth(); } } else regenT = 0;
-  if (hunger <= 0 && health > 0) { starveT += dt; if (starveT > 4) { starveT = 0; hurt(1); } } else starveT = 0;
+  if (hunger <= 0 && health > 0) { starveT += dt; if (starveT > 4) { starveT = 0; hurt(1, 'starve'); } } else starveT = 0;
   drawHunger();
 
   camera.getWorldDirection(dirVec);

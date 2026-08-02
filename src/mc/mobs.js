@@ -194,7 +194,7 @@ class Mob {
         }
       } else { // melee
         dirx = dxp; dirz = dzp;
-        if (dist < cfg.reach && this.cool <= 0) { ctx.hurtPlayer(cfg.dmg); this.cool = 0.8; }
+        if (dist < cfg.reach && this.cool <= 0) { ctx.hurtPlayer(cfg.dmg, 'zombie'); this.cool = 0.8; }
       }
     } else {
       // Wander (and flee: move away from player).
@@ -311,7 +311,7 @@ export class Mobs {
       sfx: ctx.sfx,
       hurtPlayer: ctx.hurtPlayer,
       shoot: (f, t) => this.shoot(f, t),
-      explode: (p, d) => { ctx.hurtPlayer(Math.max(1, Math.round(6 - d))); ctx.sfx('boom'); this._crater(p); },
+      explode: (p, d) => { ctx.hurtPlayer(Math.max(1, Math.round(6 - d)), 'creeper'); ctx.sfx('boom'); this._crater(p); },
     };
     for (let i = this.list.length - 1; i >= 0; i--) {
       const m = this.list[i];
@@ -334,7 +334,7 @@ export class Mobs {
       a.mesh.position.z += a.vz * dt;
       a.mesh.lookAt(a.mesh.position.x + a.vx, a.mesh.position.y + a.vy, a.mesh.position.z + a.vz);
       const dp = a.mesh.position.distanceTo(ctx.playerPos.clone().setY(ctx.playerPos.y + 0.9));
-      if (dp < 0.8) { ctx.hurtPlayer(2); a.life = 0; }
+      if (dp < 0.8) { ctx.hurtPlayer(2, 'skeleton'); a.life = 0; }
       if (a.life <= 0 || a.mesh.position.y < groundTop(this.world, a.mesh.position.x, a.mesh.position.z) - 1) {
         this.scene.remove(a.mesh);
         this.arrows.splice(i, 1);
