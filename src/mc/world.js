@@ -8,13 +8,57 @@ import * as THREE from 'three';
 import { B, isOpaque, isSolid, isGravity, faceTile } from './blocks.js';
 import { buildAtlas, COLS, ROWS } from './textures.js';
 
-export const SX = 64;
-export const SY = 40;
-export const SZ = 64;
-export const SEA = 14;
+export const SX = 160;
+export const SY = 56;
+export const SZ = 160;
+export const SEA = 20;
 const CHUNK = 16;
 const CX = SX / CHUNK;
 const CZ = SZ / CHUNK;
+
+// --- Deterministic value noise (2D + 3D) for terrain, biomes, and caves ------
+function hash2(x, z) {
+  let h = Math.imul(x, 374761393) ^ Math.imul(z, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function hash3(x, y, z) {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+const smooth = (t) => t * t * (3 - 2 * t);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function noise2(x, z) {
+  const x0 = Math.floor(x), z0 = Math.floor(z);
+  const u = smooth(x - x0), v = smooth(z - z0);
+  return lerp(
+    lerp(hash2(x0, z0), hash2(x0 + 1, z0), u),
+    lerp(hash2(x0, z0 + 1), hash2(x0 + 1, z0 + 1), u),
+    v,
+  );
+}
+function noise3(x, y, z) {
+  const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
+  const u = smooth(x - x0), v = smooth(y - y0), w = smooth(z - z0);
+  const c = (dx, dy, dz) => hash3(x0 + dx, y0 + dy, z0 + dz);
+  const y00 = lerp(lerp(c(0, 0, 0), c(1, 0, 0), u), lerp(c(0, 1, 0), c(1, 1, 0), u), v);
+  const y11 = lerp(lerp(c(0, 0, 1), c(1, 0, 1), u), lerp(c(0, 1, 1), c(1, 1, 1), u), v);
+  return lerp(y00, y11, w);
+}
+function fbm2(x, z, oct) {
+  let f = 0, a = 0.5, fr = 1;
+  for (let i = 0; i < oct; i++) { f += noise2(x * fr, z * fr) * a; fr *= 2; a *= 0.5; }
+  return f;
+}
+function fbm3(x, y, z, oct) {
+  let f = 0, a = 0.5, fr = 1;
+  for (let i = 0; i < oct; i++) { f += noise3(x * fr, y * fr, z * fr) * a; fr *= 2; a *= 0.5; }
+  return f;
+}
 
 // Face definitions: direction, face category (for color), corner offsets, shade.
 const DIRS = [
@@ -66,46 +110,75 @@ export class VoxelWorld {
     this.data[this.idx(x, y, z)] = t;
   }
 
-  // Height of the ground column at (x,z).
+  // Ground height at a column: rolling hills + sharpened mountain peaks.
   _height(x, z) {
-    return Math.round(
-      SEA + 3.5 * Math.sin(x * 0.15) * Math.cos(z * 0.13) +
-      2.2 * Math.sin(x * 0.07 + 1) * Math.cos(z * 0.09 + 0.5) +
-      1.2 * Math.sin(x * 0.29 + 2) * Math.cos(z * 0.24),
-    );
+    const roll = fbm2(x * 0.014, z * 0.014, 4);
+    const mount = Math.pow(fbm2(x * 0.0055 + 40, z * 0.0055, 4), 2.2);
+    const cont = fbm2(x * 0.02 + 7, z * 0.02, 3);
+    return Math.min(SY - 2, Math.floor(SEA - 6 + roll * 12 + mount * 40 + cont * 4));
+  }
+
+  // Biome from two low-frequency "temperature"/"moisture" fields.
+  _biome(x, z) {
+    const t = fbm2(x * 0.0045 + 100, z * 0.0045, 3);
+    const m = fbm2(x * 0.0045, z * 0.0045 + 100, 3);
+    if (t < 0.4) return 'snow';
+    if (t > 0.6 && m < 0.45) return 'desert';
+    if (m > 0.55) return 'forest';
+    return 'plains';
+  }
+
+  _cave(x, y, z) {
+    return fbm3(x * 0.055, y * 0.09, z * 0.055, 2) > 0.66;
+  }
+
+  _oreRng(x, y, z) {
+    return hash3(x * 13 + 1, y * 13 + 7, z * 13 + 5);
   }
 
   _generate() {
     const rng = mulberry32(777);
     for (let x = 0; x < SX; x++) {
       for (let z = 0; z < SZ; z++) {
+        const biome = this._biome(x, z);
         const h = this._height(x, z);
         for (let y = 0; y <= h; y++) {
           let t;
-          if (y < h - 3) {
-            // Stone, occasionally with an ore vein (iron deeper, coal higher).
+          if (y < h - 4) {
             t = B.STONE;
-            const r = rng();
-            if (r < 0.012 && y < SEA - 4) t = B.IRON_ORE;
-            else if (r < 0.03) t = B.COAL_ORE;
-            else if (r < 0.045) t = B.GRAVEL;
+            const r = this._oreRng(x, y, z);
+            if (r < 0.01 && y < SEA - 4) t = B.IRON_ORE;
+            else if (r < 0.028) t = B.COAL_ORE;
+            else if (r < 0.04) t = B.GRAVEL;
           } else if (y < h) {
-            t = B.DIRT;
+            t = biome === 'desert' ? B.SAND : B.DIRT;
           } else {
-            t = h < SEA + 1 ? B.SAND : h > SEA + 7 ? B.SNOW : B.GRASS; // beaches; snow caps
+            // Surface block by biome / elevation.
+            if (h <= SEA) t = B.SAND; // sea floor
+            else if (h > SEA + 30) t = B.SNOW; // mountain cap
+            else if (biome === 'desert') t = B.SAND;
+            else if (biome === 'snow') t = B.SNOW;
+            else if (h <= SEA + 1) t = B.SAND; // beach
+            else t = B.GRASS;
           }
+          if (y > 2 && y < h - 2 && this._cave(x, y, z)) t = B.AIR; // carve caves
           this._set(x, y, z, t);
         }
         for (let y = h + 1; y <= SEA; y++) this._set(x, y, z, B.WATER); // fill oceans
       }
     }
-    // Scatter trees on grass above the water line.
-    for (let i = 0; i < 90; i++) {
-      const x = 2 + Math.floor(rng() * (SX - 4));
-      const z = 2 + Math.floor(rng() * (SZ - 4));
-      const h = this._height(x, z);
-      if (h < SEA + 1) continue;
-      this._tree(x, h + 1, z, rng);
+    // Trees, denser in forests, keeping canopies inside world bounds.
+    for (let x = 2; x < SX - 2; x++) {
+      for (let z = 2; z < SZ - 2; z++) {
+        const biome = this._biome(x, z);
+        if (biome === 'desert') continue;
+        const h = this._height(x, z);
+        if (h < SEA + 1) continue;
+        const top = this.get(x, h, z);
+        if (top !== B.GRASS && top !== B.SNOW) continue;
+        const density = biome === 'forest' ? 0.06 : biome === 'snow' ? 0.02 : 0.014;
+        if (hash2(x * 7 + 1, z * 7 + 3) < density) this._tree(x, h + 1, z, rng);
+      }
     }
   }
 
