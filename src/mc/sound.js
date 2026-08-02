@@ -78,3 +78,33 @@ export function sfxPlace(type) {
   noise(p.freq * 0.8, 1, 0.09, 0.28, p.filt);
   knock(p.tone || 150, 0.09, 0.18);
 }
+
+// Pitched sine sweep (for blips/twangs).
+function sweep(f0, f1, dur, gain, type = 'square') {
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  osc.type = type;
+  const g = ctx.createGain();
+  const t = ctx.currentTime;
+  osc.frequency.setValueAtTime(f0, t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + dur);
+}
+
+/** Mob / combat sounds, keyed by a short name. */
+export function sfxMob(kind) {
+  switch (kind) {
+    case 'hit': noise(500, 1, 0.08, 0.3, 'bandpass'); knock(160, 0.08, 0.18); break; // melee thwack
+    case 'die': sweep(300, 90, 0.35, 0.28, 'sawtooth'); noise(400, 0.6, 0.2, 0.15, 'lowpass'); break;
+    case 'orb': sweep(700, 1300, 0.12, 0.14, 'sine'); break;
+    case 'bow': sweep(900, 500, 0.14, 0.16, 'triangle'); break;
+    case 'hiss': noise(2200, 0.4, 0.5, 0.22, 'highpass'); break; // creeper
+    case 'boom': sweep(200, 40, 0.5, 0.35, 'sawtooth'); noise(300, 0.5, 0.4, 0.28, 'lowpass'); break;
+    case 'hurt': noise(300, 0.8, 0.14, 0.3, 'lowpass'); knock(120, 0.14, 0.2); break; // player took damage
+    default: break;
+  }
+}

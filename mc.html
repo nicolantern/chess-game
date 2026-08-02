@@ -13,6 +13,8 @@
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { height: 100%; overflow: hidden; background: #8ec5ff; }
       #scene { display: block; width: 100vw; height: 100vh; }
+      #hurtflash { position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .12s;
+        background: radial-gradient(ellipse at center, rgba(180,0,0,0) 45%, rgba(180,0,0,.85) 100%); }
       #crosshair {
         position: fixed; left: 50%; top: 50%; z-index: 4; transform: translate(-50%, -50%);
         width: 26px; height: 26px; pointer-events: none; mix-blend-mode: difference;
@@ -74,6 +76,7 @@
   </head>
   <body>
     <canvas id="scene"></canvas>
+    <div id="hurtflash"></div>
     <a id="back" href="./index.html">← Chess</a>
     <div id="fps">–– fps</div>
     <div id="crosshair"></div>

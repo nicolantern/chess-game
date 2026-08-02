@@ -10,7 +10,8 @@ import { raycast } from './raycast.js';
 import { Particles } from './particles.js';
 import { DayNight } from './daynight.js';
 import { Inventory } from './inventory.js';
-import { initAudio, sfxDig, sfxPlace } from './sound.js';
+import { Mobs } from './mobs.js';
+import { initAudio, sfxDig, sfxPlace, sfxMob } from './sound.js';
 import { B, NAMES, swatchCss, breakTime } from './blocks.js';
 
 const $ = (id) => document.getElementById(id);
@@ -31,6 +32,7 @@ const player = new Player(world, camera);
 const particles = new Particles(scene);
 const dayNight = new DayNight(scene, world);
 const inv = new Inventory(36, 9);
+const mobs = new Mobs(scene, world);
 
 // Targeted-block highlight + a darkening "cracks" cube for mining progress.
 const highlight = new THREE.LineSegments(
@@ -58,6 +60,9 @@ function hurt(dmg) {
   if (dmg <= 0) return;
   health = Math.max(0, health - dmg);
   drawHealth();
+  sfxMob('hurt');
+  const f = $('hurtflash');
+  if (f) { f.style.opacity = '0.5'; setTimeout(() => { f.style.opacity = '0'; }, 120); }
   if (health <= 0) {
     player.respawn();
     health = 20; hunger = 20;
@@ -171,7 +176,10 @@ addEventListener('wheel', (e) => {
 addEventListener('mousedown', (e) => {
   if (!locked) return;
   if (e.button === 0) {
-    mining = true;
+    // Attack a mob if one is in front within reach; otherwise start mining.
+    camera.getWorldDirection(dirVec);
+    if (mobs.tryAttack(camera.position, dirVec, 4, 4)) sfxMob('hit');
+    else mining = true;
   } else if (e.button === 2) {
     const hit = currentHit;
     const bt = inv.selectedType();
@@ -211,6 +219,13 @@ function frame(now) {
 
   player.update(dt, invOpen ? NONE : keys);
   dayNight.update(dt);
+  mobs.update(dt, {
+    playerPos: player.pos,
+    isNight: dayNight.isNight,
+    hurtPlayer: hurt,
+    gainXp,
+    sfx: sfxMob,
+  });
 
   // Fall damage: >3 blocks fallen hurts for (fall − 3).
   if (player.landedFall > 3) hurt(Math.floor(player.landedFall - 3));
