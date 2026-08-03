@@ -13,7 +13,7 @@ import { Inventory } from './inventory.js';
 import { Mobs } from './mobs.js';
 import { initAudio, sfxDig, sfxPlace, sfxMob } from './sound.js';
 import { B, NAMES, swatchCss, breakTime } from './blocks.js';
-import { I, isItem, isTool, isStackable, itemIcon, itemName, maxDurability, tierColor, miningMultiplier, attackDamage } from './items.js';
+import { I, isItem, isTool, isArmor, armorSlot, armorPoints, isStackable, itemIcon, itemName, maxDurability, tierColor, miningMultiplier, attackDamage } from './items.js';
 import { craftResult } from './crafting.js';
 import { smeltResult, fuelSeconds, SMELT_TIME } from './smelting.js';
 
@@ -57,6 +57,11 @@ crack.visible = false;
 scene.add(crack);
 
 // --- Survival stats -------------------------------------------------------
+// Worn armor by slot; index 0..3 = head/chest/legs/feet.
+const ARMOR_NAMES = ['head', 'chest', 'legs', 'feet'];
+const armorSlots = [null, null, null, null];
+const totalArmor = () => armorSlots.reduce((s, a) => s + (a ? armorPoints(a.id) : 0), 0);
+
 let health = 20; // 20 = 10 hearts
 let hunger = 20; // 20 = 10 drumsticks (float)
 let level = 0;
@@ -77,6 +82,14 @@ const DEATH_MSG = {
 function hurt(dmg, cause) {
   if (dmg <= 0 || dead) return;
   if (cause) lastCause = cause;
+  // Armor absorbs up to 80% (each point = 4%); starvation ignores armor.
+  const protect = cause !== 'starve';
+  if (protect && totalArmor() > 0) {
+    dmg = Math.max(0, Math.round(dmg * (1 - Math.min(0.8, totalArmor() * 0.04))));
+    for (let i = 0; i < 4; i++) if (armorSlots[i]) { armorSlots[i].dur -= 1; if (armorSlots[i].dur <= 0) armorSlots[i] = null; } // armor wears
+    drawArmor();
+  }
+  if (dmg <= 0) return;
   health = Math.max(0, health - dmg);
   drawHealth();
   sfxMob('hurt');
@@ -160,7 +173,14 @@ function drawXp() {
   $('xpfill').style.width = `${(xp / xpNeed()) * 100}%`;
   $('xplevel').textContent = level > 0 ? level : '';
 }
-function refreshHud() { drawHotbar(); drawHealth(); drawHunger(); drawXp(); }
+function drawArmor() {
+  const pts = totalArmor();
+  const n = Math.round(pts / 2);
+  let h = '';
+  for (let i = 0; i < 10 && pts > 0; i++) h += `<span class="ar ${i < n ? 'full' : 'empty'}">🛡️</span>`;
+  $('armor').innerHTML = h;
+}
+function refreshHud() { drawHotbar(); drawHealth(); drawHunger(); drawXp(); drawArmor(); }
 refreshHud();
 
 // --- Inventory GUI (cursor-held model + 3×3 crafting) ---------------------
@@ -180,11 +200,12 @@ const curFurnace = () => furnaces.get(openFurnaceKey);
 const guiOpen = () => invOpen || furnaceOpen;
 
 const stackable = (id) => isStackable(id);
-const makeStack = (id, count) => (isTool(id) ? { id, count: 1, dur: maxDurability(id) } : { id, count });
+const makeStack = (id, count) => (!isStackable(id) ? { id, count: 1, dur: maxDurability(id) } : { id, count });
 
 const getSlot = (store, i) => {
   if (store === 'inv') return inv.slots[i];
   if (store === 'craft') return craft[i];
+  if (store === 'armor') return armorSlots[i];
   const f = curFurnace();
   if (!f) return null;
   return store === 'fin' ? f.input : store === 'ffuel' ? f.fuel : store === 'fout' ? f.output : null;
@@ -192,6 +213,7 @@ const getSlot = (store, i) => {
 const setSlot = (store, i, v) => {
   if (store === 'inv') { inv.slots[i] = v; return; }
   if (store === 'craft') { craft[i] = v; return; }
+  if (store === 'armor') { armorSlots[i] = v; return; }
   const f = curFurnace();
   if (!f) return;
   if (store === 'fin') f.input = v; else if (store === 'ffuel') f.fuel = v; else if (store === 'fout') f.output = v;
@@ -210,11 +232,14 @@ function buildInv() {
   for (let i = 0; i < inv.hotbar; i++) hot += slotDiv('inv', i, inv.slots[i]);
   let grid = '';
   for (let i = 0; i < 9; i++) grid += slotDiv('craft', i, craft[i]);
+  let arm = '';
+  for (let i = 0; i < 4; i++) arm += slotDiv('armor', i, armorSlots[i]);
   const out = craftResult(craft.map((c) => (c ? c.id : null)));
   const outSlot = out ? makeStack(out.id, out.count) : null;
   invEl.querySelector('.inv-main').innerHTML = main;
   invEl.querySelector('.inv-hot').innerHTML = hot;
   invEl.querySelector('.inv-craft').innerHTML = grid;
+  invEl.querySelector('.inv-armor').innerHTML = arm;
   invEl.querySelector('.inv-result').innerHTML = slotDiv('result', 0, outSlot);
   invEl.querySelectorAll('.slot').forEach((d) => { d.onclick = () => clickSlot(d.dataset.store, +d.dataset.i); });
   drawHotbar();
@@ -223,6 +248,12 @@ function buildInv() {
 
 function clickSlot(store, i) {
   if (store === 'result') { takeResult(); return; }
+  if (store === 'armor') { // equip slot: only the matching armor piece fits
+    const s = armorSlots[i];
+    if (!cursor) { if (s) { cursor = s; armorSlots[i] = null; } }
+    else if (isArmor(cursor.id) && armorSlot(cursor.id) === ARMOR_NAMES[i]) { armorSlots[i] = cursor; cursor = s; }
+    drawArmor(); rebuildGui(); return;
+  }
   if (store === 'fout') { // furnace output: take only, never place into
     const s = getSlot('fout', 0);
     if (s) {

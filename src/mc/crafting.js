@@ -42,6 +42,15 @@ const RAW_SHAPED = [
   { out: { id: I.DIA_AXE, count: 1 }, pat: [[D, D], [D, S], [N, S]] },
   { out: { id: I.DIA_SHOVEL, count: 1 }, pat: [[D], [S], [S]] },
   { out: { id: I.DIA_SWORD, count: 1 }, pat: [[D], [D], [S]] },
+  // Armor (helmet / chestplate / leggings / boots) in iron and diamond.
+  { out: { id: I.IRON_HELM, count: 1 }, pat: [[Fe, Fe, Fe], [Fe, N, Fe]] },
+  { out: { id: I.IRON_CHEST, count: 1 }, pat: [[Fe, N, Fe], [Fe, Fe, Fe], [Fe, Fe, Fe]] },
+  { out: { id: I.IRON_LEGS, count: 1 }, pat: [[Fe, Fe, Fe], [Fe, N, Fe], [Fe, N, Fe]] },
+  { out: { id: I.IRON_BOOTS, count: 1 }, pat: [[Fe, N, Fe], [Fe, N, Fe]] },
+  { out: { id: I.DIA_HELM, count: 1 }, pat: [[D, D, D], [D, N, D]] },
+  { out: { id: I.DIA_CHEST, count: 1 }, pat: [[D, N, D], [D, D, D], [D, D, D]] },
+  { out: { id: I.DIA_LEGS, count: 1 }, pat: [[D, D, D], [D, N, D], [D, N, D]] },
+  { out: { id: I.DIA_BOOTS, count: 1 }, pat: [[D, N, D], [D, N, D]] },
 ];
 const SHAPED = RAW_SHAPED.map((r) => ({
   out: r.out,

@@ -52,6 +52,9 @@
       .hp.empty { color: #571d23; }
       .hp.half { background: linear-gradient(90deg, #ff3b4e 50%, #571d23 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
       .fd.empty { filter: grayscale(1) brightness(.55); opacity: .6; }
+      #armor { display: flex; gap: 1px; margin-bottom: 2px; }
+      .ar { font-size: 15px; line-height: 1; text-shadow: 0 1px 2px #000; }
+      .ar.empty { filter: grayscale(1) brightness(.55); opacity: .55; }
       #xp { position: relative; height: 9px; background: #2b2b2b; border: 1px solid #000; border-radius: 2px; }
       #xpfill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(#9bf05a, #5fce2f); border-radius: 2px; }
       #xplevel { position: absolute; left: 50%; top: -17px; transform: translateX(-50%); color: #8ef04a; font: 800 14px system-ui; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
@@ -67,6 +70,8 @@
       .inv-panel .slot.on { outline: 2px solid #ffe27a; }
       .inv-top { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 14px; }
       .inv-craft { display: grid; grid-template-columns: repeat(3, 42px); gap: 4px; }
+      .inv-armor { display: grid; grid-template-columns: 42px; gap: 4px; }
+      .inv-armor .slot { position: relative; }
       .inv-result .slot, .inv-craft .slot { position: relative; }
       .inv-arrow { font: 700 26px system-ui; color: #565656; padding-bottom: 8px; }
       .slot .icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 23px; }
@@ -115,6 +120,7 @@
       <b>WASD</b> move · <b>Mouse</b> look · <b>Space</b> jump · <b>Shift</b> sprint · <b>Hold L-click</b> mine · <b>R-click</b> place · <b>1–9 / scroll</b> select · <b>E</b> inventory · <b>Esc</b> release
     </div>
     <div id="stats">
+      <div class="row"><div id="armor"></div><div></div></div>
       <div class="row"><div id="health"></div><div id="hunger"></div></div>
       <div id="xp"><div id="xpfill"></div><div id="xplevel"></div></div>
     </div>
@@ -122,6 +128,7 @@
     <div id="inv">
       <div class="inv-panel">
         <div class="inv-top">
+          <div><div class="inv-title">Armor</div><div class="inv-armor"></div></div>
           <div><div class="inv-title">Crafting (3×3)</div><div class="inv-craft"></div></div>
           <div class="inv-arrow">→</div>
           <div><div class="inv-title">&nbsp;</div><div class="inv-result"></div></div>
