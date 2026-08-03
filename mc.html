@@ -65,6 +65,16 @@
       .inv-hot { margin-top: 12px; }
       .inv-panel .slot { width: 42px; height: 42px; border: 2px solid #8a8a8a; background: #8b8b8b; border-radius: 3px; box-shadow: inset 2px 2px 0 rgba(255,255,255,.25), inset -2px -2px 0 rgba(0,0,0,.2); }
       .inv-panel .slot.on { outline: 2px solid #ffe27a; }
+      .inv-top { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 14px; }
+      .inv-craft { display: grid; grid-template-columns: repeat(3, 42px); gap: 4px; }
+      .inv-result .slot, .inv-craft .slot { position: relative; }
+      .inv-arrow { font: 700 26px system-ui; color: #565656; padding-bottom: 8px; }
+      .slot .icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 23px; }
+      .slot .durbar { position: absolute; left: 3px; right: 3px; bottom: 3px; height: 3px; background: #2b2b2b; border-radius: 2px; }
+      .slot .durbar span { display: block; height: 100%; border-radius: 2px; }
+      #cursoritem { position: fixed; z-index: 13; width: 40px; height: 40px; margin: -20px 0 0 -20px; pointer-events: none; display: none; border-radius: 3px; }
+      #cursoritem .icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 23px; }
+      #cursoritem .count { position: absolute; right: 2px; bottom: -2px; font: 800 13px system-ui; color: #fff; text-shadow: 0 1px 2px #000; }
 
       /* Death screen */
       #killscreen { position: fixed; inset: 0; z-index: 20; display: none; flex-direction: column;
@@ -101,11 +111,17 @@
     <div id="hotbar"></div>
     <div id="inv">
       <div class="inv-panel">
+        <div class="inv-top">
+          <div><div class="inv-title">Crafting (3×3)</div><div class="inv-craft"></div></div>
+          <div class="inv-arrow">→</div>
+          <div><div class="inv-title">&nbsp;</div><div class="inv-result"></div></div>
+        </div>
         <div class="inv-title">Inventory</div>
         <div class="inv-main"></div>
         <div class="inv-hot"></div>
       </div>
     </div>
+    <div id="cursoritem"></div>
     <div id="overlay">Click to play<small>WASD move · mouse look · left-click mine · right-click place · E for inventory</small></div>
     <div id="killscreen">
       <h1>You Died!</h1>

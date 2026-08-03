@@ -13,6 +13,12 @@ import { Inventory } from './inventory.js';
 import { Mobs } from './mobs.js';
 import { initAudio, sfxDig, sfxPlace, sfxMob } from './sound.js';
 import { B, NAMES, swatchCss, breakTime } from './blocks.js';
+import { isItem, isTool, isStackable, itemIcon, itemName, maxDurability, tierColor, miningMultiplier, attackDamage } from './items.js';
+import { craftResult } from './crafting.js';
+
+const DROP = { [B.STONE]: B.COBBLE }; // stone drops cobblestone, like Minecraft
+const dropFor = (t) => DROP[t] ?? t;
+const label = (id) => (isItem(id) ? itemName(id) : NAMES[id] || 'Block');
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('scene');
@@ -103,6 +109,20 @@ function gainXp(n) {
 }
 
 // --- HUD ------------------------------------------------------------------
+// Slot contents: a block shows its colour swatch (+ stack count); an item shows
+// its icon (+ a durability bar for tools, or a count for stackables).
+function slotStyle(slot) { return slot && !isItem(slot.id) ? `background:${swatchCss(slot.id)}` : ''; }
+function slotInner(slot) {
+  if (!slot) return '';
+  if (!isItem(slot.id)) return slot.count > 1 ? `<span class="count">${slot.count}</span>` : '';
+  let inner = `<span class="icon">${itemIcon(slot.id)}</span>`;
+  if (slot.dur != null) {
+    const pct = Math.max(0, Math.min(1, slot.dur / maxDurability(slot.id)));
+    const col = pct > 0.5 ? '#5fce2f' : pct > 0.25 ? '#e0c020' : '#d63b3b';
+    inner += `<span class="durbar"><span style="width:${pct * 100}%;background:${col}"></span></span>`;
+  } else if (slot.count > 1) inner += `<span class="count">${slot.count}</span>`;
+  return inner;
+}
 function drawHotbar() {
   const el = $('hotbar');
   el.innerHTML = '';
@@ -110,8 +130,12 @@ function drawHotbar() {
     const s = inv.slots[i];
     const slot = document.createElement('div');
     slot.className = 'slot' + (i === inv.sel ? ' on' : '') + (s ? '' : ' empty');
-    if (s) { slot.style.background = swatchCss(s.type); slot.title = NAMES[s.type]; }
-    slot.innerHTML = `<span class="key">${i + 1}</span>${s ? `<span class="count">${s.count}</span>` : ''}`;
+    if (s) {
+      const st = slotStyle(s); if (st) slot.style.cssText = st;
+      slot.title = label(s.id);
+      const tc = isItem(s.id) ? tierColor(s.id) : null; if (tc) slot.style.borderColor = tc;
+    }
+    slot.innerHTML = `<span class="key">${i + 1}</span>${slotInner(s)}`;
     el.appendChild(slot);
   }
 }
@@ -137,36 +161,89 @@ function drawXp() {
 function refreshHud() { drawHotbar(); drawHealth(); drawHunger(); drawXp(); }
 refreshHud();
 
-// --- Inventory GUI --------------------------------------------------------
+// --- Inventory GUI (cursor-held model + 3×3 crafting) ---------------------
 const invEl = $('inv');
+const cursorEl = $('cursoritem');
 let invOpen = false;
-let held = null; // slot index picked up in the GUI
+let cursor = null; // { id, count, dur? } held on the mouse
+const craft = new Array(9).fill(null); // 3×3 crafting grid
 
-function slotHtml(i) {
-  const s = inv.slots[i];
-  const on = held === i ? ' on' : '';
-  const bg = s ? `style="background:${swatchCss(s.type)}"` : '';
-  return `<div class="slot${s ? '' : ' empty'}${on}" data-i="${i}" ${bg} title="${s ? NAMES[s.type] : ''}">${s ? `<span class="count">${s.count}</span>` : ''}</div>`;
+const stackable = (id) => isStackable(id);
+const makeStack = (id, count) => (isTool(id) ? { id, count: 1, dur: maxDurability(id) } : { id, count });
+
+const getSlot = (store, i) => (store === 'inv' ? inv.slots[i] : store === 'craft' ? craft[i] : null);
+const setSlot = (store, i, v) => { if (store === 'inv') inv.slots[i] = v; else if (store === 'craft') craft[i] = v; };
+
+function slotDiv(store, i, slot, cls = '') {
+  const st = slotStyle(slot);
+  return `<div class="slot ${slot ? '' : 'empty'} ${cls}" data-store="${store}" data-i="${i}" style="${st}" title="${slot ? label(slot.id) : ''}">${slotInner(slot)}</div>`;
 }
+
 function buildInv() {
   let main = '';
-  for (let i = inv.hotbar; i < inv.size; i++) main += slotHtml(i); // 27 storage
+  for (let i = inv.hotbar; i < inv.size; i++) main += slotDiv('inv', i, inv.slots[i]);
   let hot = '';
-  for (let i = 0; i < inv.hotbar; i++) hot += slotHtml(i); // 9 hotbar
+  for (let i = 0; i < inv.hotbar; i++) hot += slotDiv('inv', i, inv.slots[i]);
+  let grid = '';
+  for (let i = 0; i < 9; i++) grid += slotDiv('craft', i, craft[i]);
+  const out = craftResult(craft.map((c) => (c ? c.id : null)));
+  const outSlot = out ? makeStack(out.id, out.count) : null;
   invEl.querySelector('.inv-main').innerHTML = main;
   invEl.querySelector('.inv-hot').innerHTML = hot;
-  invEl.querySelectorAll('.slot').forEach((d) => {
-    d.onclick = () => onSlotClick(+d.dataset.i);
-  });
+  invEl.querySelector('.inv-craft').innerHTML = grid;
+  invEl.querySelector('.inv-result').innerHTML = slotDiv('result', 0, outSlot);
+  invEl.querySelectorAll('.slot').forEach((d) => { d.onclick = () => clickSlot(d.dataset.store, +d.dataset.i); });
+  drawHotbar();
+  updateCursorEl();
 }
-function onSlotClick(i) {
-  if (held === null) { if (inv.slots[i]) held = i; }
-  else { inv.moveSlot(held, i); held = null; }
+
+function clickSlot(store, i) {
+  if (store === 'result') { takeResult(); return; }
+  const s = getSlot(store, i);
+  if (!cursor) {
+    if (s) { cursor = s; setSlot(store, i, null); }
+  } else if (!s) {
+    setSlot(store, i, cursor); cursor = null;
+  } else if (s.id === cursor.id && stackable(s.id)) {
+    const n = Math.min(64 - s.count, cursor.count);
+    s.count += n; cursor.count -= n;
+    if (cursor.count <= 0) cursor = null;
+  } else {
+    setSlot(store, i, cursor); cursor = s;
+  }
   buildInv();
+}
+
+function takeResult() {
+  const out = craftResult(craft.map((c) => (c ? c.id : null)));
+  if (!out) return;
+  if (cursor && (cursor.id !== out.id || !stackable(out.id))) return;
+  if (cursor) cursor.count += out.count;
+  else cursor = makeStack(out.id, out.count);
+  for (let i = 0; i < 9; i++) { const c = craft[i]; if (c) { c.count -= 1; if (c.count <= 0) craft[i] = null; } } // consume ingredients
+  buildInv();
+}
+
+function updateCursorEl() {
+  if (!cursor) { cursorEl.style.display = 'none'; return; }
+  cursorEl.style.display = 'block';
+  cursorEl.style.background = !isItem(cursor.id) ? swatchCss(cursor.id) : 'transparent';
+  cursorEl.innerHTML = slotInner(cursor);
+}
+
+function putBack(slot) {
+  if (!slot) return;
+  if (stackable(slot.id)) { inv.add(slot.id, slot.count); return; }
+  for (let i = 0; i < inv.size; i++) if (!inv.slots[i]) { inv.slots[i] = slot; return; }
+}
+function openInv() { invOpen = true; document.exitPointerLock(); buildInv(); invEl.classList.add('show'); }
+function closeInv() {
+  invOpen = false;
+  putBack(cursor); cursor = null;
+  for (let i = 0; i < 9; i++) { putBack(craft[i]); craft[i] = null; }
+  invEl.classList.remove('show');
   drawHotbar();
 }
-function openInv() { invOpen = true; held = null; document.exitPointerLock(); buildInv(); invEl.classList.add('show'); }
-function closeInv() { invOpen = false; invEl.classList.remove('show'); }
 
 // --- Input ----------------------------------------------------------------
 const keys = new Set();
@@ -182,7 +259,10 @@ document.addEventListener('pointerlockchange', () => {
   overlay.classList.toggle('hidden', locked || invOpen || dead);
   if (!locked) mining = false;
 });
-document.addEventListener('mousemove', (e) => { if (locked) player.look(e.movementX, e.movementY); });
+document.addEventListener('mousemove', (e) => {
+  if (locked) player.look(e.movementX, e.movementY);
+  else if (invOpen) { cursorEl.style.left = `${e.clientX}px`; cursorEl.style.top = `${e.clientY}px`; }
+});
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 addEventListener('keydown', (e) => {
@@ -205,12 +285,15 @@ addEventListener('mousedown', (e) => {
   if (e.button === 0) {
     // Attack a mob if one is in front within reach; otherwise start mining.
     camera.getWorldDirection(dirVec);
-    if (mobs.tryAttack(camera.position, dirVec, 4, 4)) sfxMob('hit');
-    else mining = true;
+    const sel = inv.selectedId();
+    if (mobs.tryAttack(camera.position, dirVec, 4, attackDamage(sel))) {
+      sfxMob('hit');
+      if (isTool(sel)) { inv.damageSlot(inv.sel); drawHotbar(); }
+    } else mining = true;
   } else if (e.button === 2) {
     const hit = currentHit;
-    const bt = inv.selectedType();
-    if (!hit || bt == null) return;
+    const bt = inv.selectedId();
+    if (!hit || bt == null || isItem(bt)) return; // only blocks can be placed
     const tx = hit.x + hit.nx, ty = hit.y + hit.ny, tz = hit.z + hit.nz;
     if (!placeHitsPlayer(tx, ty, tz)) { world.edit(tx, ty, tz, bt); inv.spendSelected(); drawHotbar(); sfxPlace(bt); }
   }
@@ -279,7 +362,7 @@ function frame(now) {
     const key = `${currentHit.x},${currentHit.y},${currentHit.z}`;
     if (key !== mineKey) { mineKey = key; mineProgress = 0; }
     const t = world.get(currentHit.x, currentHit.y, currentHit.z);
-    const need = breakTime(t);
+    const need = breakTime(t) / miningMultiplier(inv.selectedId(), t); // the right tool mines faster
     mineProgress += dt;
     digTickT += dt;
     if (digTickT >= 0.2) { digTickT = 0; sfxDig(t, false); }
@@ -288,7 +371,9 @@ function frame(now) {
     crack.material.opacity = 0.12 + 0.5 * Math.min(1, mineProgress / need);
     if (mineProgress >= need) {
       world.edit(currentHit.x, currentHit.y, currentHit.z, B.AIR);
-      inv.add(t, 1); drawHotbar();
+      inv.add(dropFor(t), 1);
+      if (isTool(inv.selectedId())) inv.damageSlot(inv.sel); // tools wear out
+      drawHotbar();
       particles.burst(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5, t);
       sfxDig(t, true);
       gainXp(t === B.COAL_ORE || t === B.IRON_ORE ? 3 : 1);
