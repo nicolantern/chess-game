@@ -13,10 +13,12 @@ import { Inventory } from './inventory.js';
 import { Mobs } from './mobs.js';
 import { initAudio, sfxDig, sfxPlace, sfxMob } from './sound.js';
 import { B, NAMES, swatchCss, breakTime } from './blocks.js';
-import { isItem, isTool, isStackable, itemIcon, itemName, maxDurability, tierColor, miningMultiplier, attackDamage } from './items.js';
+import { I, isItem, isTool, isStackable, itemIcon, itemName, maxDurability, tierColor, miningMultiplier, attackDamage } from './items.js';
 import { craftResult } from './crafting.js';
+import { smeltResult, fuelSeconds, SMELT_TIME } from './smelting.js';
 
-const DROP = { [B.STONE]: B.COBBLE }; // stone drops cobblestone, like Minecraft
+// What a mined block drops (defaults to itself).
+const DROP = { [B.STONE]: B.COBBLE, [B.COAL_ORE]: I.COAL, [B.DIAMOND_ORE]: I.DIAMOND };
 const dropFor = (t) => DROP[t] ?? t;
 const label = (id) => (isItem(id) ? itemName(id) : NAMES[id] || 'Block');
 
@@ -163,16 +165,38 @@ refreshHud();
 
 // --- Inventory GUI (cursor-held model + 3×3 crafting) ---------------------
 const invEl = $('inv');
+const furnaceEl = $('furnace');
 const cursorEl = $('cursoritem');
 let invOpen = false;
 let cursor = null; // { id, count, dur? } held on the mouse
 const craft = new Array(9).fill(null); // 3×3 crafting grid
 
+// Per-block furnace state, keyed by "x,y,z".
+const furnaces = new Map();
+let furnaceOpen = false;
+let openFurnaceKey = null;
+const emptyFurnace = () => ({ input: null, fuel: null, output: null, progress: 0, burnLeft: 0, burnMax: 0 });
+const curFurnace = () => furnaces.get(openFurnaceKey);
+const guiOpen = () => invOpen || furnaceOpen;
+
 const stackable = (id) => isStackable(id);
 const makeStack = (id, count) => (isTool(id) ? { id, count: 1, dur: maxDurability(id) } : { id, count });
 
-const getSlot = (store, i) => (store === 'inv' ? inv.slots[i] : store === 'craft' ? craft[i] : null);
-const setSlot = (store, i, v) => { if (store === 'inv') inv.slots[i] = v; else if (store === 'craft') craft[i] = v; };
+const getSlot = (store, i) => {
+  if (store === 'inv') return inv.slots[i];
+  if (store === 'craft') return craft[i];
+  const f = curFurnace();
+  if (!f) return null;
+  return store === 'fin' ? f.input : store === 'ffuel' ? f.fuel : store === 'fout' ? f.output : null;
+};
+const setSlot = (store, i, v) => {
+  if (store === 'inv') { inv.slots[i] = v; return; }
+  if (store === 'craft') { craft[i] = v; return; }
+  const f = curFurnace();
+  if (!f) return;
+  if (store === 'fin') f.input = v; else if (store === 'ffuel') f.fuel = v; else if (store === 'fout') f.output = v;
+};
+const rebuildGui = () => { if (invOpen) buildInv(); if (furnaceOpen) buildFurnace(); };
 
 function slotDiv(store, i, slot, cls = '') {
   const st = slotStyle(slot);
@@ -199,6 +223,14 @@ function buildInv() {
 
 function clickSlot(store, i) {
   if (store === 'result') { takeResult(); return; }
+  if (store === 'fout') { // furnace output: take only, never place into
+    const s = getSlot('fout', 0);
+    if (s) {
+      if (!cursor) { cursor = s; setSlot('fout', 0, null); }
+      else if (cursor.id === s.id && stackable(s.id)) { const n = Math.min(64 - cursor.count, s.count); cursor.count += n; s.count -= n; if (s.count <= 0) setSlot('fout', 0, null); }
+    }
+    rebuildGui(); return;
+  }
   const s = getSlot(store, i);
   if (!cursor) {
     if (s) { cursor = s; setSlot(store, i, null); }
@@ -211,7 +243,7 @@ function clickSlot(store, i) {
   } else {
     setSlot(store, i, cursor); cursor = s;
   }
-  buildInv();
+  rebuildGui();
 }
 
 function takeResult() {
@@ -221,8 +253,50 @@ function takeResult() {
   if (cursor) cursor.count += out.count;
   else cursor = makeStack(out.id, out.count);
   for (let i = 0; i < 9; i++) { const c = craft[i]; if (c) { c.count -= 1; if (c.count <= 0) craft[i] = null; } } // consume ingredients
-  buildInv();
+  rebuildGui();
 }
+
+// --- Furnace GUI + smelting ----------------------------------------------
+function buildFurnace() {
+  const f = curFurnace();
+  if (!f) return;
+  furnaceEl.querySelector('.f-in').innerHTML = slotDiv('fin', 0, f.input);
+  furnaceEl.querySelector('.f-fuel').innerHTML = slotDiv('ffuel', 0, f.fuel);
+  furnaceEl.querySelector('.f-out').innerHTML = slotDiv('fout', 0, f.output);
+  furnaceEl.querySelector('.f-flame').style.opacity = f.burnLeft > 0 ? '1' : '0.25';
+  furnaceEl.querySelector('.f-progress > span').style.width = `${Math.min(1, f.progress / SMELT_TIME) * 100}%`;
+  furnaceEl.querySelectorAll('.slot').forEach((d) => { d.onclick = () => clickSlot(d.dataset.store, +d.dataset.i); });
+  drawHotbar();
+  updateCursorEl();
+}
+
+function smeltTick(dt) {
+  const f = curFurnace();
+  if (!f) return;
+  const recipe = smeltResult(f.input && f.input.id);
+  const canOutput = recipe && (!f.output || (f.output.id === recipe.id && f.output.count < 64));
+  if (recipe && canOutput) {
+    if (f.burnLeft <= 0 && f.fuel) {
+      const s = fuelSeconds(f.fuel.id);
+      if (s > 0) { f.burnLeft = s; f.burnMax = s; f.fuel.count -= 1; if (f.fuel.count <= 0) f.fuel = null; }
+    }
+    if (f.burnLeft > 0) {
+      f.burnLeft -= dt;
+      f.progress += dt;
+      if (f.progress >= SMELT_TIME) {
+        f.progress = 0;
+        f.output = f.output ? { id: recipe.id, count: f.output.count + recipe.count } : { id: recipe.id, count: recipe.count };
+        f.input.count -= 1; if (f.input.count <= 0) f.input = null;
+      }
+    } else f.progress = Math.max(0, f.progress - dt * 2);
+  } else {
+    f.progress = Math.max(0, f.progress - dt * 2);
+  }
+  buildFurnace();
+}
+
+function openFurnace(key) { furnaceOpen = true; openFurnaceKey = key; document.exitPointerLock(); buildFurnace(); furnaceEl.classList.add('show'); }
+function closeFurnace() { furnaceOpen = false; putBack(cursor); cursor = null; openFurnaceKey = null; furnaceEl.classList.remove('show'); drawHotbar(); }
 
 function updateCursorEl() {
   if (!cursor) { cursorEl.style.display = 'none'; return; }
@@ -251,23 +325,23 @@ const NONE = new Set();
 let locked = false;
 let mining = false;
 
-const lock = () => { initAudio(); if (!locked && !invOpen && !dead) canvas.requestPointerLock(); };
+const lock = () => { initAudio(); if (!locked && !guiOpen() && !dead) canvas.requestPointerLock(); };
 canvas.addEventListener('click', lock);
 overlay.addEventListener('click', lock);
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  overlay.classList.toggle('hidden', locked || invOpen || dead);
+  overlay.classList.toggle('hidden', locked || guiOpen() || dead);
   if (!locked) mining = false;
 });
 document.addEventListener('mousemove', (e) => {
   if (locked) player.look(e.movementX, e.movementY);
-  else if (invOpen) { cursorEl.style.left = `${e.clientX}px`; cursorEl.style.top = `${e.clientY}px`; }
+  else if (guiOpen()) { cursorEl.style.left = `${e.clientX}px`; cursorEl.style.top = `${e.clientY}px`; }
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 addEventListener('keydown', (e) => {
-  if (e.code === 'KeyE') { invOpen ? closeInv() : openInv(); return; }
-  if (e.code === 'Escape' && invOpen) { closeInv(); return; }
+  if (e.code === 'KeyE') { if (furnaceOpen) closeFurnace(); else if (invOpen) closeInv(); else openInv(); return; }
+  if (e.code === 'Escape') { if (invOpen) { closeInv(); return; } if (furnaceOpen) { closeFurnace(); return; } }
   keys.add(e.code);
   if (e.code === 'Space') e.preventDefault();
   const m = e.code.match(/^Digit([1-9])$/);
@@ -292,10 +366,16 @@ addEventListener('mousedown', (e) => {
     } else mining = true;
   } else if (e.button === 2) {
     const hit = currentHit;
+    if (!hit) return;
+    if (world.get(hit.x, hit.y, hit.z) === B.FURNACE) { openFurnace(`${hit.x},${hit.y},${hit.z}`); return; } // right-click opens the furnace
     const bt = inv.selectedId();
-    if (!hit || bt == null || isItem(bt)) return; // only blocks can be placed
+    if (bt == null || isItem(bt)) return; // only blocks can be placed
     const tx = hit.x + hit.nx, ty = hit.y + hit.ny, tz = hit.z + hit.nz;
-    if (!placeHitsPlayer(tx, ty, tz)) { world.edit(tx, ty, tz, bt); inv.spendSelected(); drawHotbar(); sfxPlace(bt); }
+    if (!placeHitsPlayer(tx, ty, tz)) {
+      world.edit(tx, ty, tz, bt);
+      if (bt === B.FURNACE) furnaces.set(`${tx},${ty},${tz}`, emptyFurnace());
+      inv.spendSelected(); drawHotbar(); sfxPlace(bt);
+    }
   }
 });
 addEventListener('mouseup', (e) => { if (e.button === 0) mining = false; });
@@ -327,8 +407,9 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
-  player.update(dt, (invOpen || dead) ? NONE : keys);
+  player.update(dt, (guiOpen() || dead) ? NONE : keys);
   dayNight.update(dt);
+  if (furnaceOpen) smeltTick(dt);
   mobs.update(dt, {
     playerPos: player.pos,
     isNight: dayNight.isNight,
@@ -343,7 +424,7 @@ function frame(now) {
   // Hunger drains (faster sprinting); high hunger regenerates health, empty
   // hunger starves.
   const sprinting = (keys.has('ShiftLeft') || keys.has('ShiftRight')) && (keys.has('KeyW') || keys.has('KeyA') || keys.has('KeyS') || keys.has('KeyD'));
-  if (!invOpen) hunger = Math.max(0, hunger - dt * (sprinting ? 0.25 : 0.11));
+  if (!guiOpen()) hunger = Math.max(0, hunger - dt * (sprinting ? 0.25 : 0.11));
   if (hunger >= 18 && health < 20) { regenT += dt; if (regenT > 3) { regenT = 0; health = Math.min(20, health + 1); drawHealth(); } } else regenT = 0;
   if (hunger <= 0 && health > 0) { starveT += dt; if (starveT > 4) { starveT = 0; hurt(1, 'starve'); } } else starveT = 0;
   drawHunger();
@@ -370,8 +451,14 @@ function frame(now) {
     crack.position.set(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5);
     crack.material.opacity = 0.12 + 0.5 * Math.min(1, mineProgress / need);
     if (mineProgress >= need) {
+      const bkey = `${currentHit.x},${currentHit.y},${currentHit.z}`;
       world.edit(currentHit.x, currentHit.y, currentHit.z, B.AIR);
       inv.add(dropFor(t), 1);
+      if (t === B.FURNACE && furnaces.has(bkey)) { // spill the furnace's contents
+        const f = furnaces.get(bkey);
+        for (const s of [f.input, f.fuel, f.output]) if (s) inv.add(s.id, s.count);
+        furnaces.delete(bkey);
+      }
       if (isTool(inv.selectedId())) inv.damageSlot(inv.sel); // tools wear out
       drawHotbar();
       particles.burst(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5, t);

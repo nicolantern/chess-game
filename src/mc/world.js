@@ -147,7 +147,8 @@ export class VoxelWorld {
           if (y < h - 4) {
             t = B.STONE;
             const r = this._oreRng(x, y, z);
-            if (r < 0.01 && y < SEA - 4) t = B.IRON_ORE;
+            if (y < 12 && r < 0.004) t = B.DIAMOND_ORE; // diamonds deep down
+            else if (r < 0.01 && y < SEA - 4) t = B.IRON_ORE;
             else if (r < 0.028) t = B.COAL_ORE;
             else if (r < 0.04) t = B.GRAVEL;
           } else if (y < h) {

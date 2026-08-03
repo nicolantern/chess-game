@@ -8,6 +8,7 @@ import { B } from './blocks.js';
 import { I } from './items.js';
 
 const P = B.PLANK, C = B.COBBLE, S = I.STICK, N = null;
+const Fe = I.IRON_INGOT, D = I.DIAMOND;
 
 // Trim a size×size grid to the bounding box of its non-null cells.
 function bbox(cells, size) {
@@ -32,6 +33,15 @@ const RAW_SHAPED = [
   { out: { id: I.STONE_AXE, count: 1 }, pat: [[C, C], [C, S], [N, S]] },
   { out: { id: I.STONE_SHOVEL, count: 1 }, pat: [[C], [S], [S]] },
   { out: { id: I.STONE_SWORD, count: 1 }, pat: [[C], [C], [S]] },
+  { out: { id: B.FURNACE, count: 1 }, pat: [[C, C, C], [C, N, C], [C, C, C]] },
+  { out: { id: I.IRON_PICK, count: 1 }, pat: [[Fe, Fe, Fe], [N, S, N], [N, S, N]] },
+  { out: { id: I.IRON_AXE, count: 1 }, pat: [[Fe, Fe], [Fe, S], [N, S]] },
+  { out: { id: I.IRON_SHOVEL, count: 1 }, pat: [[Fe], [S], [S]] },
+  { out: { id: I.IRON_SWORD, count: 1 }, pat: [[Fe], [Fe], [S]] },
+  { out: { id: I.DIA_PICK, count: 1 }, pat: [[D, D, D], [N, S, N], [N, S, N]] },
+  { out: { id: I.DIA_AXE, count: 1 }, pat: [[D, D], [D, S], [N, S]] },
+  { out: { id: I.DIA_SHOVEL, count: 1 }, pat: [[D], [S], [S]] },
+  { out: { id: I.DIA_SWORD, count: 1 }, pat: [[D], [D], [S]] },
 ];
 const SHAPED = RAW_SHAPED.map((r) => ({
   out: r.out,

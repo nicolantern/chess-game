@@ -7,6 +7,7 @@ export const B = {
   AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WATER: 5,
   WOOD: 6, LEAVES: 7, PLANK: 8, COBBLE: 9,
   GRAVEL: 10, GLASS: 11, COAL_ORE: 12, IRON_ORE: 13, SNOW: 14,
+  DIAMOND_ORE: 15, FURNACE: 16,
 };
 
 const C = (hex) => {
@@ -29,6 +30,8 @@ const DEF = {
   [B.COAL_ORE]: { top: C('#6f6f6f'), side: C('#6f6f6f'), bottom: C('#6f6f6f') },
   [B.IRON_ORE]: { top: C('#a9968a'), side: C('#a9968a'), bottom: C('#a9968a') },
   [B.SNOW]: { top: C('#eef3f7'), side: C('#e6ecf2'), bottom: C('#dfe6ec') },
+  [B.DIAMOND_ORE]: { top: C('#8fd7d0'), side: C('#8fd7d0'), bottom: C('#8fd7d0') },
+  [B.FURNACE]: { top: C('#6f6f6f'), side: C('#7a7a7a'), bottom: C('#6f6f6f') },
   [B.WATER]: { top: C('#3f86c8'), side: C('#3f86c8'), bottom: C('#3f86c8') },
 };
 
@@ -37,6 +40,7 @@ export const TILE = {
   GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, SAND: 4,
   WOOD_TOP: 5, WOOD_SIDE: 6, LEAVES: 7, PLANK: 8, COBBLE: 9, WATER: 10,
   GRAVEL: 11, GLASS: 12, COAL_ORE: 13, IRON_ORE: 14, SNOW: 15,
+  DIAMOND_ORE: 16, FURNACE_TOP: 17, FURNACE_SIDE: 18, FURNACE_FRONT: 19,
 };
 
 export function faceTile(type, cat) {
@@ -54,6 +58,8 @@ export function faceTile(type, cat) {
     case B.COAL_ORE: return TILE.COAL_ORE;
     case B.IRON_ORE: return TILE.IRON_ORE;
     case B.SNOW: return TILE.SNOW;
+    case B.DIAMOND_ORE: return TILE.DIAMOND_ORE;
+    case B.FURNACE: return cat === 'top' ? TILE.FURNACE_TOP : cat === 'bottom' ? TILE.FURNACE_TOP : TILE.FURNACE_FRONT;
     case B.WATER: return TILE.WATER;
     default: return TILE.STONE;
   }
@@ -63,7 +69,7 @@ export function faceTile(type, cat) {
 export const BREAK_TIME = {
   [B.GRASS]: 0.75, [B.DIRT]: 0.75, [B.SAND]: 0.6, [B.GRAVEL]: 0.6, [B.LEAVES]: 0.3,
   [B.SNOW]: 0.2, [B.GLASS]: 0.3, [B.STONE]: 2.5, [B.COBBLE]: 3, [B.WOOD]: 3,
-  [B.PLANK]: 2.5, [B.COAL_ORE]: 3, [B.IRON_ORE]: 3.5,
+  [B.PLANK]: 2.5, [B.COAL_ORE]: 3, [B.IRON_ORE]: 3.5, [B.DIAMOND_ORE]: 4, [B.FURNACE]: 3.5,
 };
 export const breakTime = (t) => BREAK_TIME[t] ?? 1;
 
@@ -84,7 +90,7 @@ export const NAMES = {
   [B.GRASS]: 'Grass', [B.DIRT]: 'Dirt', [B.STONE]: 'Stone', [B.SAND]: 'Sand',
   [B.WOOD]: 'Wood', [B.LEAVES]: 'Leaves', [B.PLANK]: 'Planks', [B.COBBLE]: 'Cobble',
   [B.GRAVEL]: 'Gravel', [B.GLASS]: 'Glass', [B.COAL_ORE]: 'Coal Ore',
-  [B.IRON_ORE]: 'Iron Ore', [B.SNOW]: 'Snow',
+  [B.IRON_ORE]: 'Iron Ore', [B.SNOW]: 'Snow', [B.DIAMOND_ORE]: 'Diamond Ore', [B.FURNACE]: 'Furnace',
 };
 
 export const swatchCss = (t) => {

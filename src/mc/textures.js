@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { TILE } from './blocks.js';
 
 const PX = 16; // tile is 16×16 pixels
-export const COLS = 4;
+export const COLS = 8;
 export const ROWS = 4;
 
 export function buildAtlas() {
@@ -118,6 +118,24 @@ export function buildAtlas() {
     for (let i = 0; i < PX; i++) { ctx.fillRect(ox + i, oy, 1, 1); ctx.fillRect(ox + i, oy + PX - 1, 1, 1); ctx.fillRect(ox, oy + i, 1, 1); ctx.fillRect(ox + PX - 1, oy + i, 1, 1); }
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     for (let i = 2; i < 8; i++) ctx.fillRect(ox + i, oy + i, 1, 1);
+  }
+
+  // Diamond ore: stone with cyan gems.
+  {
+    const [ox, oy] = fill(TILE.DIAMOND_ORE, 140, 140, 140, 12);
+    for (let i = 0; i < 10; i++) { const x = (Math.random() * PX) | 0, y = (Math.random() * PX) | 0; set(ox, oy, x, y, 120, 230, 220); if (Math.random() < 0.5) set(ox, oy, (x + 1) % PX, y, 90, 200, 195); }
+  }
+  fill(TILE.FURNACE_SIDE, 120, 120, 120, 10, 0.05, 96, 96, 96);
+  // Furnace top: grey with a dark round vent.
+  {
+    const [ox, oy] = fill(TILE.FURNACE_TOP, 118, 118, 118, 10);
+    for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) if (Math.hypot(x - 7.5, y - 7.5) < 3.5) set(ox, oy, x, y, 60, 60, 60);
+  }
+  // Furnace front: grey with a dark opening + orange glow at the bottom.
+  {
+    const [ox, oy] = fill(TILE.FURNACE_FRONT, 120, 120, 120, 10);
+    for (let y = 8; y < 14; y++) for (let x = 4; x < 12; x++) set(ox, oy, x, y, 40, 34, 30);
+    for (let x = 5; x < 11; x++) { set(ox, oy, x, 12, 240, 150, 40); set(ox, oy, x, 13, 210, 90, 30); }
   }
 
   const tex = new THREE.CanvasTexture(cv);

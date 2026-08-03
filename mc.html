@@ -76,6 +76,16 @@
       #cursoritem .icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 23px; }
       #cursoritem .count { position: absolute; right: 2px; bottom: -2px; font: 800 13px system-ui; color: #fff; text-shadow: 0 1px 2px #000; }
 
+      /* Furnace GUI */
+      #furnace { position: fixed; inset: 0; z-index: 12; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+      #furnace.show { display: flex; }
+      #furnace .slot { position: relative; }
+      .furnace-body { display: flex; align-items: center; gap: 18px; padding: 6px 4px; }
+      .furnace-left { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+      .f-flame { font-size: 22px; line-height: 1; transition: opacity .1s; }
+      .f-progress { width: 90px; height: 12px; background: #2b2b2b; border: 1px solid #000; border-radius: 3px; position: relative; }
+      .f-progress > span { position: absolute; inset: 0; width: 0; background: linear-gradient(#ffd36a, #ff9a2e); border-radius: 3px; }
+
       /* Death screen */
       #killscreen { position: fixed; inset: 0; z-index: 20; display: none; flex-direction: column;
         align-items: center; justify-content: center; background: rgba(90,0,0,.55); backdrop-filter: blur(2px); }
@@ -119,6 +129,20 @@
         <div class="inv-title">Inventory</div>
         <div class="inv-main"></div>
         <div class="inv-hot"></div>
+      </div>
+    </div>
+    <div id="furnace">
+      <div class="inv-panel">
+        <div class="inv-title">Furnace</div>
+        <div class="furnace-body">
+          <div class="furnace-left">
+            <div class="f-in"></div>
+            <div class="f-flame">🔥</div>
+            <div class="f-fuel"></div>
+          </div>
+          <div class="f-progress"><span></span></div>
+          <div class="f-out"></div>
+        </div>
       </div>
     </div>
     <div id="cursoritem"></div>
