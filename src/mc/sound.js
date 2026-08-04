@@ -105,6 +105,7 @@ export function sfxMob(kind) {
     case 'hiss': noise(2200, 0.4, 0.5, 0.22, 'highpass'); break; // creeper
     case 'boom': sweep(200, 40, 0.5, 0.35, 'sawtooth'); noise(300, 0.5, 0.4, 0.28, 'lowpass'); break;
     case 'hurt': noise(300, 0.8, 0.14, 0.3, 'lowpass'); knock(120, 0.14, 0.2); break; // player took damage
+    case 'eat': noise(600, 0.6, 0.07, 0.2, 'lowpass'); knock(220, 0.06, 0.12); break; // chewing bite
     default: break;
   }
 }

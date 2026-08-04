@@ -13,7 +13,7 @@ import { Inventory } from './inventory.js';
 import { Mobs } from './mobs.js';
 import { initAudio, sfxDig, sfxPlace, sfxMob } from './sound.js';
 import { B, NAMES, swatchCss, breakTime } from './blocks.js';
-import { I, isItem, isTool, isArmor, armorSlot, armorPoints, isStackable, itemIcon, itemName, maxDurability, tierColor, miningMultiplier, attackDamage } from './items.js';
+import { I, isItem, isTool, isArmor, isFood, foodHunger, armorSlot, armorPoints, isStackable, itemIcon, itemName, maxDurability, tierColor, miningMultiplier, attackDamage } from './items.js';
 import { craftResult } from './crafting.js';
 import { smeltResult, fuelSeconds, SMELT_TIME } from './smelting.js';
 
@@ -396,10 +396,15 @@ addEventListener('mousedown', (e) => {
       if (isTool(sel)) { inv.damageSlot(inv.sel); drawHotbar(); }
     } else mining = true;
   } else if (e.button === 2) {
+    const sel = inv.selectedId();
+    if (sel != null && isFood(sel)) { // eat held food to restore hunger
+      if (hunger < 20) { hunger = Math.min(20, hunger + foodHunger(sel)); inv.spendSelected(); drawHunger(); drawHotbar(); sfxMob('eat'); }
+      return;
+    }
     const hit = currentHit;
     if (!hit) return;
     if (world.get(hit.x, hit.y, hit.z) === B.FURNACE) { openFurnace(`${hit.x},${hit.y},${hit.z}`); return; } // right-click opens the furnace
-    const bt = inv.selectedId();
+    const bt = sel;
     if (bt == null || isItem(bt)) return; // only blocks can be placed
     const tx = hit.x + hit.nx, ty = hit.y + hit.ny, tz = hit.z + hit.nz;
     if (!placeHitsPlayer(tx, ty, tz)) {
@@ -447,6 +452,7 @@ function frame(now) {
     hurtPlayer: hurt,
     gainXp,
     sfx: sfxMob,
+    giveItem: (id, n) => { inv.add(id, n); drawHotbar(); },
   });
 
   // Fall damage: >3 blocks fallen hurts for (fall − 3).

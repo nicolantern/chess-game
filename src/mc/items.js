@@ -16,6 +16,7 @@ export const I = {
   DIA_PICK: 1041, DIA_AXE: 1042, DIA_SHOVEL: 1043, DIA_SWORD: 1044,
   IRON_HELM: 1051, IRON_CHEST: 1052, IRON_LEGS: 1053, IRON_BOOTS: 1054,
   DIA_HELM: 1061, DIA_CHEST: 1062, DIA_LEGS: 1063, DIA_BOOTS: 1064,
+  RAW_BEEF: 1070, STEAK: 1071,
 };
 
 // tool: { cls: 'pick'|'axe'|'shovel'|'sword', speed, dur, dmg, tier }
@@ -52,6 +53,9 @@ const DEFS = {
   [I.DIA_CHEST]: { name: 'Diamond Chestplate', icon: '🦺', tier: 'diamond', armor: { slot: 'chest', points: 8, dur: 528 } },
   [I.DIA_LEGS]: { name: 'Diamond Leggings', icon: '👖', tier: 'diamond', armor: { slot: 'legs', points: 6, dur: 495 } },
   [I.DIA_BOOTS]: { name: 'Diamond Boots', icon: '🥾', tier: 'diamond', armor: { slot: 'feet', points: 3, dur: 429 } },
+
+  [I.RAW_BEEF]: { name: 'Raw Beef', icon: '🥩', stack: true, food: { hunger: 3 } },
+  [I.STEAK]: { name: 'Steak', icon: '🍖', stack: true, food: { hunger: 8 } },
 };
 
 export const itemDef = (id) => DEFS[id];
@@ -59,6 +63,8 @@ export const itemName = (id) => (DEFS[id] ? DEFS[id].name : 'Item');
 export const itemIcon = (id) => (DEFS[id] ? DEFS[id].icon : '❔');
 export const isTool = (id) => Boolean(DEFS[id] && DEFS[id].tool);
 export const isArmor = (id) => Boolean(DEFS[id] && DEFS[id].armor);
+export const isFood = (id) => Boolean(DEFS[id] && DEFS[id].food);
+export const foodHunger = (id) => (isFood(id) ? DEFS[id].food.hunger : 0);
 export const armorSlot = (id) => (isArmor(id) ? DEFS[id].armor.slot : null);
 export const armorPoints = (id) => (isArmor(id) ? DEFS[id].armor.points : 0);
 export const isStackable = (id) => !isItem(id) || Boolean(DEFS[id] && DEFS[id].stack);

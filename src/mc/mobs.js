@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { B, isSolid } from './blocks.js';
+import { I } from './items.js';
 import { SY } from './world.js';
 
 const GRAVITY = 24;
@@ -70,7 +71,7 @@ function groundTop(world, x, z) {
 // --- Mob type definitions -------------------------------------------------
 // shape 'quad' (cow) or 'biped' (humanoids). behavior handled per `hostile`.
 const TYPES = {
-  cow: { hostile: false, hp: 8, speed: 1.6, shape: 'quad', face: 'cow', body: '#6a4a34', head: '#e9e2d6', bw: 0.7, bh: 0.7, bl: 1.1, hs: 0.5, legLen: 0.7, xp: 2 },
+  cow: { hostile: false, hp: 8, speed: 1.6, shape: 'quad', face: 'cow', body: '#6a4a34', head: '#e9e2d6', bw: 0.7, bh: 0.7, bl: 1.1, hs: 0.5, legLen: 0.7, xp: 2, drop: { id: I.RAW_BEEF, min: 1, max: 3 } },
   zombie: { hostile: true, kind: 'melee', hp: 10, speed: 2.6, shape: 'biped', face: 'zombie', body: '#3f7a4a', head: '#5a8a5a', legcol: '#3a4a7a', xp: 3, dmg: 3, reach: 1.35 },
   skeleton: { hostile: true, kind: 'ranged', hp: 8, speed: 2.4, shape: 'biped', face: 'skeleton', body: '#d8d8d0', head: '#e6e6de', legcol: '#c9c9c1', xp: 3, range: 13, dmg: 2 },
   creeper: { hostile: true, kind: 'boom', hp: 8, speed: 2.7, shape: 'creeper', face: 'creeper', body: '#4fa64f', head: '#57b257', xp: 4 },
@@ -318,7 +319,12 @@ export class Mobs {
       m.update(dt, mctx);
       const far = Math.hypot(m.pos.x - ctx.playerPos.x, m.pos.z - ctx.playerPos.z) > 70;
       if (m.dead || far) {
-        if (m.dead) { this._orb(m.pos, m.cfg.xp); ctx.sfx('die'); }
+        if (m.dead) {
+          this._orb(m.pos, m.cfg.xp);
+          ctx.sfx('die');
+          const d = m.cfg.drop;
+          if (d && ctx.giveItem) ctx.giveItem(d.id, d.min + Math.floor(Math.random() * (d.max - d.min + 1)));
+        }
         this.scene.remove(m.mesh);
         this.list.splice(i, 1);
       }

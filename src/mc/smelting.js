@@ -9,6 +9,7 @@ const SMELT = {
   [B.IRON_ORE]: { id: I.IRON_INGOT, count: 1 },
   [B.SAND]: { id: B.GLASS, count: 1 },
   [B.COBBLE]: { id: B.STONE, count: 1 },
+  [I.RAW_BEEF]: { id: I.STEAK, count: 1 }, // cook beef into steak
 };
 export const smeltResult = (id) => (id == null ? null : SMELT[id] || null);
 
