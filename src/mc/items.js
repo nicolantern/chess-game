@@ -17,6 +17,7 @@ export const I = {
   IRON_HELM: 1051, IRON_CHEST: 1052, IRON_LEGS: 1053, IRON_BOOTS: 1054,
   DIA_HELM: 1061, DIA_CHEST: 1062, DIA_LEGS: 1063, DIA_BOOTS: 1064,
   RAW_BEEF: 1070, STEAK: 1071,
+  RAW_PORK: 1072, COOKED_PORK: 1073, RAW_MUTTON: 1074, COOKED_MUTTON: 1075,
 };
 
 // tool: { cls: 'pick'|'axe'|'shovel'|'sword', speed, dur, dmg, tier }
@@ -56,6 +57,10 @@ const DEFS = {
 
   [I.RAW_BEEF]: { name: 'Raw Beef', icon: '🥩', stack: true, food: { hunger: 3 } },
   [I.STEAK]: { name: 'Steak', icon: '🍖', stack: true, food: { hunger: 8 } },
+  [I.RAW_PORK]: { name: 'Raw Porkchop', icon: '🥓', stack: true, food: { hunger: 3 } },
+  [I.COOKED_PORK]: { name: 'Cooked Porkchop', icon: '🍖', stack: true, food: { hunger: 8 } },
+  [I.RAW_MUTTON]: { name: 'Raw Mutton', icon: '🥩', stack: true, food: { hunger: 2 } },
+  [I.COOKED_MUTTON]: { name: 'Cooked Mutton', icon: '🍗', stack: true, food: { hunger: 6 } },
 };
 
 export const itemDef = (id) => DEFS[id];

@@ -48,6 +48,16 @@ function faceOn(head, hs, kind) {
     plate(head, 0.07, 0.07, FRED, -0.13, 0.06, f + 0.006); // sunken red glint
     plate(head, 0.07, 0.07, FRED, 0.13, 0.06, f + 0.006);
     plate(head, 0.26, 0.05, FBLACK, 0, -0.15, f);
+  } else if (kind === 'pig') {
+    plate(head, 0.08, 0.08, FBLACK, -0.14, 0.1, f);
+    plate(head, 0.08, 0.08, FBLACK, 0.14, 0.1, f);
+    plate(head, 0.26, 0.2, FPINK, 0, -0.1, f + 0.005); // big snout
+    plate(head, 0.05, 0.07, FBLACK, -0.06, -0.1, f + 0.012);
+    plate(head, 0.05, 0.07, FBLACK, 0.06, -0.1, f + 0.012);
+  } else if (kind === 'sheep') {
+    plate(head, 0.09, 0.09, FBLACK, -0.13, 0.07, f);
+    plate(head, 0.09, 0.09, FBLACK, 0.13, 0.07, f);
+    plate(head, 0.22, 0.05, FBLACK, 0, -0.14, f);
   } else { // cow
     plate(head, 0.12, 0.12, FWHITE, -0.15, 0.08, f);
     plate(head, 0.12, 0.12, FWHITE, 0.15, 0.08, f);
@@ -72,6 +82,8 @@ function groundTop(world, x, z) {
 // shape 'quad' (cow) or 'biped' (humanoids). behavior handled per `hostile`.
 const TYPES = {
   cow: { hostile: false, hp: 8, speed: 1.6, shape: 'quad', face: 'cow', body: '#6a4a34', head: '#e9e2d6', bw: 0.7, bh: 0.7, bl: 1.1, hs: 0.5, legLen: 0.7, xp: 2, drop: { id: I.RAW_BEEF, min: 1, max: 3 } },
+  pig: { hostile: false, hp: 8, speed: 1.7, shape: 'quad', face: 'pig', body: '#e79aa0', head: '#eaa6ac', bw: 0.68, bh: 0.66, bl: 1.02, hs: 0.5, legLen: 0.55, xp: 2, drop: { id: I.RAW_PORK, min: 1, max: 3 } },
+  sheep: { hostile: false, hp: 8, speed: 1.4, shape: 'quad', face: 'sheep', body: '#ececec', head: '#dcd6ca', bw: 0.78, bh: 0.82, bl: 1.0, hs: 0.46, legLen: 0.5, xp: 2, drop: { id: I.RAW_MUTTON, min: 1, max: 2 } },
   zombie: { hostile: true, kind: 'melee', hp: 10, speed: 2.6, shape: 'biped', face: 'zombie', body: '#3f7a4a', head: '#5a8a5a', legcol: '#3a4a7a', xp: 3, dmg: 3, reach: 1.35 },
   skeleton: { hostile: true, kind: 'ranged', hp: 8, speed: 2.4, shape: 'biped', face: 'skeleton', body: '#d8d8d0', head: '#e6e6de', legcol: '#c9c9c1', xp: 3, range: 13, dmg: 2 },
   creeper: { hostile: true, kind: 'boom', hp: 8, speed: 2.7, shape: 'creeper', face: 'creeper', body: '#4fa64f', head: '#57b257', xp: 4 },
@@ -301,7 +313,7 @@ export class Mobs {
       this.spawnT = ctx.isNight ? 2.5 : 5;
       const type = ctx.isNight
         ? ['zombie', 'zombie', 'skeleton', 'creeper'][(Math.random() * 4) | 0]
-        : 'cow';
+        : ['cow', 'pig', 'sheep'][(Math.random() * 3) | 0];
       this._spawn(type, ctx.playerPos);
     }
 
