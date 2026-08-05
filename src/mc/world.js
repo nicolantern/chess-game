@@ -93,7 +93,10 @@ export class VoxelWorld {
     // the frame; a distinct pass so it doesn't cull neighbours like opaque blocks.
     this.glassMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.DoubleSide, transparent: true, alphaTest: 0.3 });
     this.meshes = {}; // key `${cx},${cz}` -> { opaque, water }
+    this.edits = new Map(); // voxel index -> block id, for player changes only
+    this.tracking = false;
     this._generate();
+    this.tracking = true; // record edits made after world generation (for saving)
   }
 
   idx(x, y, z) { return x + z * SX + y * SX * SZ; }
@@ -107,7 +110,18 @@ export class VoxelWorld {
 
   _set(x, y, z, t) {
     if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
-    this.data[this.idx(x, y, z)] = t;
+    const i = this.idx(x, y, z);
+    this.data[i] = t;
+    if (this.tracking) this.edits.set(i, t);
+  }
+
+  /** Player edits as [index, blockId] pairs, for saving. */
+  editList() { return Array.from(this.edits.entries()); }
+
+  /** Apply saved edits onto the freshly generated world (before build()). */
+  applyEdits(list) {
+    for (const [i, t] of list) this.data[i] = t;
+    this.edits = new Map(list);
   }
 
   // Ground height at a column: rolling hills + sharpened mountain peaks.

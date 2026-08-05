@@ -16,6 +16,9 @@ import { B, NAMES, swatchCss, breakTime } from './blocks.js';
 import { I, isItem, isTool, isArmor, isFood, foodHunger, armorSlot, armorPoints, isStackable, itemIcon, itemName, maxDurability, tierColor, miningMultiplier, attackDamage } from './items.js';
 import { craftResult } from './crafting.js';
 import { smeltResult, fuelSeconds, SMELT_TIME } from './smelting.js';
+import { loadGame, saveGame } from './save.js';
+
+const save = loadGame(); // restored below if present
 
 // What a mined block drops (defaults to itself).
 const DROP = { [B.STONE]: B.COBBLE, [B.COAL_ORE]: I.COAL, [B.DIAMOND_ORE]: I.DIAMOND };
@@ -35,6 +38,7 @@ scene.fog = new THREE.Fog(new THREE.Color('#a9d4ff'), 40, 90);
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 1000);
 
 const world = new VoxelWorld();
+if (save && save.edits) world.applyEdits(save.edits); // replay saved block changes before meshing
 world.build(scene);
 const player = new Player(world, camera);
 const particles = new Particles(scene);
@@ -514,4 +518,35 @@ function frame(now) {
   if (fpsAccum >= 0.5) { fpsEl.textContent = `${Math.round(fpsFrames / fpsAccum)} fps`; fpsAccum = 0; fpsFrames = 0; }
   requestAnimationFrame(frame);
 }
+// --- Save / restore -------------------------------------------------------
+function snapshot() {
+  return {
+    edits: world.editList(),
+    inv: inv.slots,
+    armor: armorSlots,
+    player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.yaw, pitch: player.pitch },
+    stats: { health, hunger, level, xp },
+    day: dayNight.t,
+    furnaces: [...furnaces],
+  };
+}
+function applySave(s) {
+  if (s.inv) inv.slots = s.inv;
+  if (s.armor) for (let i = 0; i < 4; i++) armorSlots[i] = s.armor[i] || null;
+  if (s.player) {
+    player.pos.set(s.player.x, s.player.y, s.player.z);
+    player.yaw = s.player.yaw; player.pitch = s.player.pitch;
+    player._syncCamera();
+  }
+  if (s.stats) { health = s.stats.health; hunger = s.stats.hunger; level = s.stats.level; xp = s.stats.xp; }
+  if (s.day != null) dayNight.t = s.day;
+  if (s.furnaces) for (const [k, v] of s.furnaces) furnaces.set(k, v);
+  refreshHud();
+}
+if (save) applySave(save);
+
+// Autosave every 10s and on unload (edits were already applied before build).
+setInterval(() => { if (!dead) saveGame(snapshot()); }, 10000);
+addEventListener('beforeunload', () => saveGame(snapshot()));
+
 frame(performance.now());
