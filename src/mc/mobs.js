@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { B, isSolid } from './blocks.js';
 import { I } from './items.js';
-import { SY } from './world.js';
+import { SX, SY, SZ } from './world.js';
 
 const GRAVITY = 24;
 const MAX_MOBS = 14;
@@ -173,9 +173,9 @@ class Mob {
   hit(dmg, dx, dz) {
     this.hp -= dmg;
     this.flash = 0.15;
-    this.flee = 4; // passives run; also nudges hostiles back
-    this.pos.x += dx * 0.8;
-    this.pos.z += dz * 0.8;
+    this.flee = 1; // brief flinch — short enough that you can catch and kill them
+    this.pos.x += dx * 0.45; // gentle knockback
+    this.pos.z += dz * 0.45;
     if (this.hp <= 0) this.dead = true;
   }
 
@@ -223,11 +223,14 @@ class Mob {
     const moving = len > 0.001;
     if (moving) {
       dirx /= len; dirz /= len;
-      const spd = cfg.speed * (this.flee > 0 ? 1.4 : 1);
+      const spd = cfg.speed * (this.flee > 0 ? 1.15 : 1);
       this.pos.x += dirx * spd * dt;
       this.pos.z += dirz * spd * dt;
       this.yaw = Math.atan2(dirx, dirz);
     }
+    // Keep mobs inside the world so they can't wander off the edge and despawn.
+    this.pos.x = Math.max(1, Math.min(SX - 1, this.pos.x));
+    this.pos.z = Math.max(1, Math.min(SZ - 1, this.pos.z));
 
     // Surface follow: climb hills, fall off edges.
     const gy = groundTop(world, this.pos.x, this.pos.z);
